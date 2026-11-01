@@ -93,22 +93,44 @@ class UserProfile {
   }
 
   static int calculateAge(String dob) {
-    final dobParts = dob.split('-');
-    if (dobParts.length == 3) {
-      final year = int.tryParse(dobParts[0]);
-      final month = int.tryParse(dobParts[1]);
-      final day = int.tryParse(dobParts[2]);
-      if (year != null && month != null && day != null) {
-        final dobDate = DateTime(year, month, day);
-        final today = DateTime.now();
-        int age = today.year - dobDate.year;
-        if (today.month < dobDate.month || (today.month == dobDate.month && today.day < dobDate.day)) {
-          age--;
-        }
-        return age;
+    int? year, month, day;
+    if (dob.contains('/')) {
+      final parts = dob.split('/');
+      if (parts.length == 3) {
+        day = int.tryParse(parts[0]);
+        month = int.tryParse(parts[1]);
+        year = int.tryParse(parts[2]);
+      }
+    } else if (dob.contains('-')) {
+      final parts = dob.split('-');
+      if (parts.length == 3) {
+        year = int.tryParse(parts[0]);
+        month = int.tryParse(parts[1]);
+        day = int.tryParse(parts[2]);
       }
     }
+    if (year != null && month != null && day != null) {
+      final dobDate = DateTime(year, month, day);
+      final today = DateTime.now();
+      int age = today.year - dobDate.year;
+      if (today.month < dobDate.month || (today.month == dobDate.month && today.day < dobDate.day)) {
+        age--;
+      }
+      return age;
+    }
     return 25;
+  }
+
+  /// Trả về chuỗi ngày sinh định dạng dd/MM/yyyy chuẩn hóa
+  String get dobFormatted {
+    if (dob.contains('/')) return dob;
+    if (dob.contains('-')) {
+      final parts = dob.split('-');
+      if (parts.length == 3) {
+        return '${parts[2].padLeft(2, '0')}/${parts[1].padLeft(2, '0')}/${parts[0]}';
+      }
+    }
+    return dob;
   }
 
   int get age => calculateAge(dob);

@@ -325,7 +325,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           Row(
             children: [
               _buildMetricItem('Giới tính', profile.gender),
-              _buildMetricItem('Tuổi', age != null ? '$age tuổi' : profile.dob),
+              _buildMetricItem('Tuổi', age != null ? '$age tuổi' : profile.dobFormatted),
+              _buildMetricItem('Ngày sinh', profile.dobFormatted),
               _buildMetricItem('Chiều cao', '${height.toStringAsFixed(0)} cm'),
               _buildMetricItem('Cân nặng', '${weight.toStringAsFixed(1)} kg'),
             ],

@@ -37,7 +37,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final profile = ref.read(profileProvider).profile;
       if (profile != null) {
-        _dobController.text = profile.dob;
+        _dobController.text = profile.dobFormatted;
         _weightController.text = profile.weight.toString();
         _heightController.text = profile.height.toString();
         setState(() {
@@ -54,7 +54,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
         });
       } else {
         // Mặc định ban đầu nếu chưa có hồ sơ
-        _dobController.text = '2000-01-01';
+        _dobController.text = '01/01/2000';
         _weightController.text = '60.0';
         _heightController.text = '170.0';
       }
@@ -72,9 +72,22 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
   Future<void> _selectDate(BuildContext context) async {
     DateTime initial = DateTime(2000, 1, 1);
     if (_dobController.text.isNotEmpty) {
-      try {
-        initial = DateTime.parse(_dobController.text);
-      } catch (_) {}
+      final text = _dobController.text.trim();
+      if (text.contains('/')) {
+        final parts = text.split('/');
+        if (parts.length == 3) {
+          final d = int.tryParse(parts[0]);
+          final m = int.tryParse(parts[1]);
+          final y = int.tryParse(parts[2]);
+          if (d != null && m != null && y != null) {
+            initial = DateTime(y, m, d);
+          }
+        }
+      } else {
+        try {
+          initial = DateTime.parse(text);
+        } catch (_) {}
+      }
     }
 
     final picked = await showDatePicker(
@@ -86,7 +99,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
     if (picked != null) {
       setState(() {
         _dobController.text =
-            "${picked.year}-${picked.month.toString().padLeft(2, '0')}-${picked.day.toString().padLeft(2, '0')}";
+            "${picked.day.toString().padLeft(2, '0')}/${picked.month.toString().padLeft(2, '0')}/${picked.year}";
       });
     }
   }
@@ -191,7 +204,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
               TextFormField(
                 controller: _dobController,
                 decoration: const InputDecoration(
-                  labelText: 'Ngày sinh (YYYY-MM-DD)',
+                  labelText: 'Ngày sinh (DD/MM/YYYY)',
                   border: OutlineInputBorder(),
                   prefixIcon: Icon(Icons.cake_outlined),
                   suffixIcon: Icon(Icons.calendar_today),
