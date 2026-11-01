@@ -76,7 +76,25 @@ class AnalyzeFoodUseCase {
       final String? foodBase64 = await ImageCompressHelper.compressAndEncodeBase64(croppedFoodImage, maxDimension: 550, quality: 75);
       final String? labelBase64 = await ImageCompressHelper.compressAndEncodeBase64(croppedLabelImage, maxDimension: 550, quality: 75);
 
-      // 4. TRẢ VỀ ĐỐI TƯỢNG LỊCH SỬ HOÀN CHỈNH
+      // 4. TÍNH KHẨU PHẦN CHUẨN & NGÀY TIÊU THỤ
+      double p100 = 0, c100 = 0, f100 = 0;
+      for (var item in nutritionArray) {
+        if (item['id'] == 'protein') p100 = (item['per_100g'] as num?)?.toDouble() ?? 0.0;
+        if (item['id'] == 'carb') c100 = (item['per_100g'] as num?)?.toDouble() ?? 0.0;
+        if (item['id'] == 'fat' || item['id'] == 'total_fat') f100 = (item['per_100g'] as num?)?.toDouble() ?? 0.0;
+      }
+      final servingInfo = repository.calculateServingUnit(
+        mainGroup: mainGroup,
+        p100: p100,
+        c100: c100,
+        f100: f100,
+        actualWeight: targetWeight,
+      );
+
+      final now = DateTime.now();
+      final dateStr = '${now.year.toString().padLeft(4, '0')}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+
+      // 5. TRẢ VỀ ĐỐI TƯỢNG LỊCH SỬ HOÀN CHỈNH
       return ScanHistory(
         originalImage: imagePath,
         croppedFoodImage: croppedFoodImage,
@@ -86,9 +104,12 @@ class AnalyzeFoodUseCase {
         labelImageBase64: labelBase64,
         foodName: detectedName,
         weight: detectedWeightInGrams,
+        servingUnits: servingInfo.servingCount,
+        consumptionRatio: 1.0,
+        logDate: dateStr,
         nutritionData: jsonNutritionData,
         mainGroup: mainGroup,
-        createdAt: DateTime.now(),
+        createdAt: now,
       );
     } catch (e) {
       debugPrint('Lỗi phân tích: $e');

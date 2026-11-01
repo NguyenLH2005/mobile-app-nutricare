@@ -1,4 +1,3 @@
-import 'dart:io';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -698,24 +697,8 @@ class _FoundObjectScreenState extends ConsumerState<FoundObjectScreen> {
   }
 
   Widget _buildFoodImageWidget() {
-    File? validFile;
-    if (_currentData.croppedFoodImage.isNotEmpty && File(_currentData.croppedFoodImage).existsSync()) {
-      validFile = File(_currentData.croppedFoodImage);
-    } else if (_currentData.originalImage.isNotEmpty && File(_currentData.originalImage).existsSync()) {
-      validFile = File(_currentData.originalImage);
-    }
-
-    Uint8List? memoryBytes;
-    if (validFile == null) {
-      final b64 = (_currentData.foodImageBase64 != null && _currentData.foodImageBase64!.isNotEmpty)
-          ? _currentData.foodImageBase64
-          : _currentData.originalImageBase64;
-      if (b64 != null && b64.isNotEmpty) {
-        try {
-          memoryBytes = base64Decode(b64);
-        } catch (_) {}
-      }
-    }
+    final validFile = _currentData.foodImageFile;
+    final memoryBytes = validFile == null ? _currentData.foodImageBytes : null;
 
     Widget imageContent;
     if (validFile != null) {
@@ -760,17 +743,8 @@ class _FoundObjectScreenState extends ConsumerState<FoundObjectScreen> {
   }
 
   Widget _buildLabelImageWidget() {
-    File? validFile;
-    if (_currentData.croppedLabelImage != null && _currentData.croppedLabelImage!.isNotEmpty && File(_currentData.croppedLabelImage!).existsSync()) {
-      validFile = File(_currentData.croppedLabelImage!);
-    }
-
-    Uint8List? memoryBytes;
-    if (validFile == null && _currentData.labelImageBase64 != null && _currentData.labelImageBase64!.isNotEmpty) {
-      try {
-        memoryBytes = base64Decode(_currentData.labelImageBase64!);
-      } catch (_) {}
-    }
+    final validFile = _currentData.labelImageFile;
+    final memoryBytes = validFile == null ? _currentData.labelImageBytes : null;
 
     if (validFile == null && memoryBytes == null) {
       return ClipRRect(

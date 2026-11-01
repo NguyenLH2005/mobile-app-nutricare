@@ -74,6 +74,108 @@ class NutritionSuggestionUseCase {
     return false;
   }
 
+
+  /// Tính toán định lượng nguyên liệu gợi ý bổ sung theo công thức (2.14 - 2.18)
+  static List<Map<String, String>> _calculateSuggestedSupplements({
+    required List<String> missingGroups,
+    required UserProfile profile,
+  }) {
+    final List<Map<String, String>> result = [];
+    final allergies = profile.allergies.map((a) => a.toLowerCase()).toList();
+    final flags = profile.medicalFlags;
+    final bool hasKidney = flags.length > 4 && flags[4] == '1';
+    final bool hasGout = flags.length > 3 && flags[3] == '1';
+    final bool hasDiabetes = flags.isNotEmpty && flags[0] == '1';
+    final bool hasLipid = flags.length > 2 && flags[2] == '1';
+
+    for (final group in missingGroups) {
+      final gLower = group.toLowerCase();
+
+      // 1. Nhóm Đạm (Cần bù ~7-14g protein cho 1 bữa ăn = 1-2 phần đạm chuẩn NIN)
+      if (gLower.contains('đạm') || gLower.contains('protein')) {
+        final List<String> options = [];
+        final bool canEgg = !allergies.any((a) => a.contains('trứng') || a.contains('egg'));
+        final bool canFish = !allergies.any((a) => a.contains('cá') || a.contains('fish'));
+        final bool canShrimp = !allergies.any((a) => a.contains('hải sản') || a.contains('tôm'));
+
+        if (canEgg && !hasKidney) {
+          options.add('1-2 quả Trứng gà (50-100g, cung cấp 7-14g đạm)');
+        }
+        if (canShrimp && !hasGout && !hasKidney) {
+          options.add('80g Tôm biển tươi (cung cấp ~14g đạm)');
+        }
+        if (!hasGout && !hasKidney) {
+          options.add('70g Thịt gà ta tươi (cung cấp ~14g đạm)');
+        }
+        if (options.isEmpty || hasKidney || hasGout || hasLipid) {
+          if (canFish && !hasGout) {
+            options.add('75g Cá lóc (cá quả) tươi (cung cấp ~14g đạm nạc, ít béo)');
+          } else {
+            options.add('100g Đậu phụ tươi (đạm thực vật lành mạnh)');
+          }
+        }
+        result.add({
+          'group': 'Chất đạm',
+          'recommendation': options.take(2).join(' hoặc '),
+        });
+      }
+
+      // 2. Nhóm Tinh bột (Cần bù ~20-30g carb = 1 phần tinh bột chuẩn NIN)
+      else if (gLower.contains('tinh bột') || gLower.contains('carb') || gLower.contains('bột đường')) {
+        final List<String> options = [];
+        options.add('100g Khoai lang tươi (cung cấp ~28g tinh bột hấp thu chậm, giàu chất xơ)');
+        if (!hasDiabetes) {
+          options.add('1 bắp Ngô tươi (khoảng 100g hạt, cung cấp ~40g tinh bột tự nhiên)');
+        } else {
+          options.add('100g Yến mạch thô');
+        }
+        result.add({
+          'group': 'Tinh bột',
+          'recommendation': options.join(' hoặc '),
+        });
+      }
+
+      // 3. Nhóm Chất xơ
+      else if (gLower.contains('chất xơ') || gLower.contains('fiber')) {
+        result.add({
+          'group': 'Chất xơ',
+          'recommendation': 'khoảng 150g Rau muống tươi hoặc Cải xanh tươi (bổ sung ~3-4g chất xơ và làm chậm hấp thu đường)',
+        });
+      }
+
+      // 4. Nhóm Vitamin và khoáng chất
+      else if (gLower.contains('vitamin') || gLower.contains('khoáng')) {
+        final List<String> options = [];
+        if (!hasKidney) {
+          options.add('100g Cà chua tươi hoặc 100g Ớt chuông tươi (giàu Vitamin C)');
+        } else {
+          options.add('100g Quả bầu tươi hoặc Dưa chuột tươi (ít Kali, an toàn bài tiết cầu thận)');
+        }
+        result.add({
+          'group': 'Vitamin và khoáng chất',
+          'recommendation': options.first,
+        });
+      }
+
+      // 5. Nhóm Chất béo (Lipid)
+      else if (gLower.contains('chất béo') || gLower.contains('fat') || gLower.contains('lipid')) {
+        final List<String> options = [];
+        final bool canNuts = !allergies.any((a) => a.contains('hạt') || a.contains('nut'));
+        if (canNuts && !hasLipid) {
+          options.add('10-15g Hạt óc chó hoặc Hạnh nhân rang (chất béo tốt cho tim mạch)');
+        } else {
+          options.add('1 thìa cà phê (khoảng 5ml) Dầu thực vật / Dầu ô liu');
+        }
+        result.add({
+          'group': 'Chất béo',
+          'recommendation': options.first,
+        });
+      }
+    }
+
+    return result;
+  }
+
   static Future<String?> generateSuggestion({
     required UserProfile profile,
     required String mainGroupStr, // VD: "Protein, Chất béo"
@@ -291,7 +393,13 @@ class NutritionSuggestionUseCase {
       }
     }
 
-    // E. Đóng gói JSON Payload chuẩn
+    // E. Tính toán định lượng nguyên liệu gợi ý bổ sung theo công thức (Công thức 2.14 - 2.18)
+    final suggestedSupplements = _calculateSuggestedSupplements(
+      missingGroups: missingGroups,
+      profile: profile,
+    );
+
+    // F. Đóng gói JSON Payload chuẩn
     final Map<String, dynamic> payload = {
       'user': {
         'medicalConditions': profile.medicalConditions,
@@ -302,6 +410,7 @@ class NutritionSuggestionUseCase {
         'holdingWeight_g': userWeight,
         'mainGroups': rawGroups,
         'missingGroups': missingGroups,
+        'suggestedSupplements': suggestedSupplements,
         'metrics100g': {
           'caloriesPercent': caloriesPercent,
           'mainGroupsPercent': mainGroupsPercent,

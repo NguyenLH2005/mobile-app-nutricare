@@ -1,5 +1,3 @@
-import 'dart:convert';
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -878,19 +876,18 @@ class _DailyProgressScreenState extends ConsumerState<DailyProgressScreen> {
       child: const Icon(Icons.fastfood, color: Colors.grey),
     );
 
-    if (scan.croppedFoodImage.isNotEmpty && File(scan.croppedFoodImage).existsSync()) {
+    final imgFile = scan.foodImageFile;
+    final imgBytes = imgFile == null ? scan.foodImageBytes : null;
+    if (imgFile != null) {
       imageWidget = ClipRRect(
         borderRadius: BorderRadius.circular(8),
-        child: Image.file(File(scan.croppedFoodImage), width: 52, height: 52, fit: BoxFit.cover),
+        child: Image.file(imgFile, width: 52, height: 52, fit: BoxFit.cover),
       );
-    } else if (scan.foodImageBase64 != null && scan.foodImageBase64!.isNotEmpty) {
-      try {
-        final bytes = base64Decode(scan.foodImageBase64!);
-        imageWidget = ClipRRect(
-          borderRadius: BorderRadius.circular(8),
-          child: Image.memory(bytes, width: 52, height: 52, fit: BoxFit.cover),
-        );
-      } catch (_) {}
+    } else if (imgBytes != null) {
+      imageWidget = ClipRRect(
+        borderRadius: BorderRadius.circular(8),
+        child: Image.memory(imgBytes, width: 52, height: 52, fit: BoxFit.cover),
+      );
     }
 
     final String timeStr = '${scan.createdAt.hour.toString().padLeft(2, '0')}:${scan.createdAt.minute.toString().padLeft(2, '0')}';

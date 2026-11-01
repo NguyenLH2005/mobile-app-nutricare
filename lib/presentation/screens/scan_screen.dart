@@ -3,7 +3,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:nckh_app/presentation/screens/found_object_screen.dart';
+import 'found_object_screen.dart';
 
 import '../state/scan_controller.dart';
 

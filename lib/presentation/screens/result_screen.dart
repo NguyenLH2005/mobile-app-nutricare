@@ -65,7 +65,9 @@ class ResultScreen extends StatelessWidget {
                         borderRadius: BorderRadius.circular(20),
                       ),
                       child: Text(
-                        'Khối lượng nhận diện: ${resultData.formatWeight(spaceBeforeUnit: false)}',
+                        resultData.consumptionRatio < 1.0
+                            ? 'Khối lượng tiêu thụ: ${resultData.actualWeight.toStringAsFixed(0)}g (ăn ${(resultData.consumptionRatio * 100).round()}% khay)'
+                            : 'Khối lượng nhận diện: ${resultData.formatWeight(spaceBeforeUnit: false)}',
                         style: TextStyle(
                           fontSize: 16,
                           color: Colors.green.shade700,
@@ -117,7 +119,9 @@ class ResultScreen extends StatelessWidget {
                         Expanded(
                           flex: 1,
                           child: Text(
-                            'Trên ${resultData.formatWeight(spaceBeforeUnit: false)}',
+                            resultData.consumptionRatio < 1.0
+                                ? 'Trên ${resultData.actualWeight.toStringAsFixed(0)}g'
+                                : 'Trên ${resultData.formatWeight(spaceBeforeUnit: false)}',
                             textAlign: TextAlign.right,
                             style: const TextStyle(
                               color: Colors.green,
@@ -162,7 +166,7 @@ class ResultScreen extends StatelessWidget {
                             Expanded(
                               flex: 1,
                               child: Text(
-                                '${item['per_label']} ${item['unit']}',
+                                '${(((item['per_label'] as num?)?.toDouble() ?? 0.0) * (resultData.consumptionRatio > 0 ? resultData.consumptionRatio : 1.0)).toStringAsFixed(1)} ${item['unit']}',
                                 textAlign: TextAlign.right,
                                 style: const TextStyle(
                                   fontSize: 16,

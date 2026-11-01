@@ -1,6 +1,3 @@
-import 'dart:io';
-import 'dart:convert';
-import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -24,24 +21,8 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
   Set<int> selectedIds = {};
 
   Widget _buildThumbnail(ScanHistory item) {
-    File? validFile;
-    if (item.croppedFoodImage.isNotEmpty && File(item.croppedFoodImage).existsSync()) {
-      validFile = File(item.croppedFoodImage);
-    } else if (item.originalImage.isNotEmpty && File(item.originalImage).existsSync()) {
-      validFile = File(item.originalImage);
-    }
-
-    Uint8List? memoryBytes;
-    if (validFile == null) {
-      final b64 = (item.foodImageBase64 != null && item.foodImageBase64!.isNotEmpty)
-          ? item.foodImageBase64
-          : item.originalImageBase64;
-      if (b64 != null && b64.isNotEmpty) {
-        try {
-          memoryBytes = base64Decode(b64);
-        } catch (_) {}
-      }
-    }
+    final validFile = item.foodImageFile;
+    final memoryBytes = validFile == null ? item.foodImageBytes : null;
 
     Widget content;
     if (validFile != null) {

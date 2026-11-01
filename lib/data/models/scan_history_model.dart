@@ -1,3 +1,5 @@
+import 'dart:io';
+import 'dart:typed_data';
 import 'dart:convert';
 
 class ScanHistory {
@@ -168,4 +170,43 @@ class ScanHistory {
     if (weight == null) return fallback;
     return formatWeightValue(weight!, spaceBeforeUnit: spaceBeforeUnit);
   }
+
+  File? get foodImageFile {
+    if (croppedFoodImage.isNotEmpty && File(croppedFoodImage).existsSync()) {
+      return File(croppedFoodImage);
+    }
+    if (originalImage.isNotEmpty && File(originalImage).existsSync()) {
+      return File(originalImage);
+    }
+    return null;
+  }
+
+  Uint8List? get foodImageBytes {
+    final b64 = (foodImageBase64 != null && foodImageBase64!.isNotEmpty)
+        ? foodImageBase64
+        : originalImageBase64;
+    if (b64 != null && b64.isNotEmpty) {
+      try {
+        return base64Decode(b64);
+      } catch (_) {}
+    }
+    return null;
+  }
+
+  File? get labelImageFile {
+    if (croppedLabelImage != null && croppedLabelImage!.isNotEmpty && File(croppedLabelImage!).existsSync()) {
+      return File(croppedLabelImage!);
+    }
+    return null;
+  }
+
+  Uint8List? get labelImageBytes {
+    if (labelImageBase64 != null && labelImageBase64!.isNotEmpty) {
+      try {
+        return base64Decode(labelImageBase64!);
+      } catch (_) {}
+    }
+    return null;
+  }
+
 }
