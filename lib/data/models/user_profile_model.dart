@@ -206,12 +206,20 @@ class UserProfile {
         ? (targetCalories * 0.07) / 9
         : (targetCalories * 0.10) / 9;
 
-    // Bệnh thận (Bit 4): trần đạm = weight * 0.6g (KDIGO 2024)
-    double ceilingProteinKidney = (flags[4] == '1') ? (weight * 0.6) : -1.0;
+    // Bệnh thận (Bit 4): trần đạm = weight * 0.8g (KDIGO 2024)
+    final bool hasKidneyDisease = flags.length > 4 && flags[4] == '1';
+    double ceilingProteinKidney = hasKidneyDisease ? (weight * 0.8) : -1.0;
 
-    // Nếu bệnh thận, ghi đè ngân sách đạm ngày
-    if (flags[4] == '1') {
-      budgetProtein = ceilingProteinKidney;
+    // GIẢI QUYẾT XUNG ĐỘT PROTEIN THẬN & TÁI PHÂN BỔ CALO BẢO TOÀN NĂNG LƯỢNG (Mục 2.1.2 & Bảng 4.3):
+    if (hasKidneyDisease) {
+      budgetProtein = ceilingProteinKidney; // Trần đạm KDIGO 2024
+      final double caloFromProtein = budgetProtein * 4;
+      final double caloRemain = targetCalories - caloFromProtein;
+      if (caloRemain > 0) {
+        // Tái phân bổ calo còn lại: 65% Carb và 35% Fat để bảo toàn tổng Target Calories
+        budgetCarb = (caloRemain * 0.65) / 4;
+        budgetFat = (caloRemain * 0.35) / 9;
+      }
     }
 
     return UserProfile(

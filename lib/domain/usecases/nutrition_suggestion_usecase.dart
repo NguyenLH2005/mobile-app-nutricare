@@ -104,6 +104,16 @@ class NutritionSuggestionUseCase {
     final bool hasCardio = flags.length > 5 && flags[5] == '1';
 
     final String foodNameLower = foodName.toLowerCase();
+    final double userWeight = (weight != null && weight > 0) ? weight : 100.0;
+
+    // Tính dưỡng chất thực tế nạp theo khối lượng tiêu thụ m_consumed (Mục 2.1.2 & Bảng 4.2)
+    final double portionRatio = userWeight / 100.0;
+    final double actualPotassium = potassium * portionRatio;
+    final double actualPhosphorus = phosphorus * portionRatio;
+    final double actualSodium = sodium * portionRatio;
+    final double actualSugars = sugars * portionRatio;
+    final double actualSatFat = satFat * portionRatio;
+    final double actualProtein = protein * portionRatio;
 
     // 1. Kiểm tra Lệnh cấm tuyệt đối (Medical Hard Veto & Absolute Allergies)
     String? vetoReason;
@@ -118,23 +128,26 @@ class NutritionSuggestionUseCase {
       }
     }
 
-    // B. Veto bệnh lý mạn tính nghiêm trọng đe dọa cấp cứu
+    // B. Veto bệnh lý mạn tính nghiêm trọng đe dọa cấp cứu (Dựa trên lượng thực tế tiêu thụ)
     if (vetoReason == null) {
-      if (hasKidney && (potassium >= 600.0 || phosphorus >= 500.0)) {
-        vetoReason = "Bạn đang mắc bệnh Thận mạn. Thực phẩm \"$foodName\" có hàm lượng Kali (${potassium.toStringAsFixed(0)}mg/100g) hoặc Photpho (${phosphorus.toStringAsFixed(0)}mg/100g) vượt ngưỡng an toàn nghiêm trọng, vượt quá khả năng bài tiết của thận và có thể dẫn đến tăng Kali máu làm loạn nhịp tim nguy hiểm.";
-      } else if (hasDiabetes && sugars >= (profile.ceilingSugar * 0.5)) {
-        vetoReason = "Bạn đang mắc bệnh Tiểu đường. Thực phẩm \"$foodName\" có hàm lượng Đường tự do quá cao (${sugars.toStringAsFixed(1)}g/100g, chiếm >= 50% trần an toàn cả ngày), có nguy cơ làm tăng đột ngột đường huyết cấp tính.";
-      } else if (hasHypertension && (sodium >= (profile.ceilingSodium * 0.5) || sodium >= 1000.0)) {
-        vetoReason = "Bạn đang mắc bệnh Tăng huyết áp. Thực phẩm \"$foodName\" có lượng Natri quá cao (${sodium.toStringAsFixed(0)}mg/100g, chiếm >= 50% trần muối an toàn cả ngày), dễ dẫn đến tăng huyết áp đột ngột.";
-      } else if (hasCardio && (sodium >= (profile.ceilingSodium * 0.5) || sodium >= 1000.0)) {
-        vetoReason = "Bạn đang mắc bệnh Tim mạch. Thực phẩm \"$foodName\" có lượng Natri quá cao (${sodium.toStringAsFixed(0)}mg/100g), có nguy cơ gây giữ nước và tăng gánh nặng tuần hoàn cấp tính cho tim.";
-      } else if (hasLipid && (transFat >= 0.5 || satFat >= (profile.ceilingSatFat * 0.5))) {
-        vetoReason = "Bạn đang mắc bệnh Rối loạn lipid máu (Mỡ máu). Thực phẩm \"$foodName\" chứa Trans fat (${transFat.toStringAsFixed(1)}g) hoặc Axit béo bão hòa quá cao (${satFat.toStringAsFixed(1)}g/100g), gây tổn thương thành mạch và làm tăng mạnh cholesterol xấu.";
+      if (hasKidney && (actualPotassium >= 600.0 || actualPhosphorus >= 400.0)) {
+        vetoReason = "Bạn đang mắc bệnh Thận mạn. Khẩu phần thực phẩm \"$foodName\" (${userWeight.toStringAsFixed(0)}g) cung cấp tới ${actualPotassium.toStringAsFixed(0)}mg Kali hoặc ${actualPhosphorus.toStringAsFixed(0)}mg Photpho (vượt 30% trần an toàn cả ngày), có nguy cơ gây quá tải bài tiết cầu thận và rối loạn nhịp tim nguy hiểm.";
+      } else if (hasDiabetes && actualSugars >= (profile.ceilingSugar * 0.5) && fiber < 1.0) {
+        vetoReason = "Bạn đang mắc bệnh Tiểu đường. Khẩu phần thực phẩm \"$foodName\" chứa lượng đường quá cao (${actualSugars.toStringAsFixed(1)}g, chiếm >= 50% trần an toàn ngày) nhưng thiếu chất xơ tự nhiên làm chậm hấp thu, có nguy cơ làm tăng đột ngột đường huyết cấp tính.";
+      } else if (hasHypertension && (actualSodium >= (profile.ceilingSodium * 0.5) || actualSodium >= 1000.0)) {
+        vetoReason = "Bạn đang mắc bệnh Tăng huyết áp. Khẩu phần này chứa lượng Natri quá lớn (${actualSodium.toStringAsFixed(0)}mg, chiếm >= 50% trần muối an toàn cả ngày), có nguy cơ kích hoạt cơn tăng huyết áp đột ngột.";
+      } else if (hasCardio && (actualSodium >= (profile.ceilingSodium * 0.5) || actualSodium >= 1000.0)) {
+        vetoReason = "Bạn đang mắc bệnh Tim mạch. Khẩu phần này chứa lượng Natri quá lớn (${actualSodium.toStringAsFixed(0)}mg), có nguy cơ gây giữ nước và tăng áp lực tuần hoàn cấp tính cho tim.";
+      } else if (hasLipid && (transFat >= 0.5 || actualSatFat >= (profile.ceilingSatFat * 0.5))) {
+        vetoReason = "Bạn đang mắc bệnh Rối loạn lipid máu (Mỡ máu). Khẩu phần chứa Trans fat (${transFat.toStringAsFixed(1)}g) hoặc Axit béo bão hòa vượt ngưỡng an toàn (${actualSatFat.toStringAsFixed(1)}g), gây tổn thương thành mạch và làm tăng mạnh cholesterol xấu.";
       } else if (hasGout) {
-        if ((foodNameLower.contains('bò') || foodNameLower.contains('heo') || foodNameLower.contains('cừu') || 
-             foodNameLower.contains('tôm') || foodNameLower.contains('cua') || foodNameLower.contains('mực') || 
-             foodNameLower.contains('tuộc') || foodNameLower.contains('hải sản')) && protein >= 20.0) {
-          vetoReason = "Bạn đang mắc bệnh Gout. Thực phẩm \"$foodName\" giàu Purine/Đạm động vật đậm đặc (${protein.toStringAsFixed(1)}g/100g), có nguy cơ kích hoạt cơn đau Gout cấp tính dữ dội.";
+        final bool isPurineRich = foodNameLower.contains('bò') || foodNameLower.contains('heo') || 
+                                  foodNameLower.contains('cừu') || foodNameLower.contains('tôm') || 
+                                  foodNameLower.contains('cua') || foodNameLower.contains('mực') || 
+                                  foodNameLower.contains('tuộc') || foodNameLower.contains('hải sản') ||
+                                  foodNameLower.contains('vịt');
+        if (isPurineRich && actualProtein >= 35.0) {
+          vetoReason = "Bạn đang mắc bệnh Gout. Khẩu phần thực phẩm giàu Purine/Đạm động vật này chứa tới ${actualProtein.toStringAsFixed(1)}g đạm động vật đậm đặc trong một bữa ăn, có nguy cơ kích hoạt cơn đau Gout cấp tính dữ dội.";
         }
       }
     }
@@ -144,7 +157,6 @@ class NutritionSuggestionUseCase {
     }
 
     // 2. Tính toán các chỉ số cho JSON gửi AI Gemini
-    final double userWeight = (weight != null && weight > 0) ? weight : 100.0;
 
     // A. % Calo
     double caloPercentRaw = (profile.targetCalories > 0) ? (calo100g / profile.targetCalories) * 100 : 0.0;

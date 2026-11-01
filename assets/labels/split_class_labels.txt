@@ -14,6 +14,7 @@ cai_xanh
 cam
 chom_chom
 chuoi
+cua
 dau_tay
 du_du
 dua_hau
@@ -23,6 +24,7 @@ hanh_nhan
 kho_qua
 khoai_lang
 khoai_tay
+khom
 le
 muc
 nam_dui_ga
@@ -41,6 +43,7 @@ thanh_long
 thit_bo
 thit_ga
 thit_heo
+thit_vit
 tom
 trung
 vai

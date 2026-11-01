@@ -1,3 +1,4 @@
+
 import 'package:flutter/services.dart';
 import 'package:csv/csv.dart';
 
@@ -52,6 +53,7 @@ class FoodRepository {
     'Cam': 'cam, tươi',
     'Chôm chôm': 'chôm chôm, tươi',
     'Chuối': 'chuối tiêu, tươi',
+    'Cua': 'Thịt cua',
     'Dâu tây': 'dâu tây, tươi',
     'Đu đủ': 'đu đủ chín, tươi',
     'Dưa hấu': 'dưa hấu, tươi',
@@ -61,6 +63,7 @@ class FoodRepository {
     'Khổ qua': 'mướp đắng, tươi',
     'Khoai lang': 'khoai lang, tươi',
     'Khoai tây': 'khoai tây, tươi',
+    'Khóm': 'Dứa ta, tươi',
     'Lê': 'lê, tươi',
     'Mực': 'mực, tươi',
     'Nấm đùi gà': 'nấm thường, tươi',
@@ -79,6 +82,7 @@ class FoodRepository {
     'Thịt bò': 'thịt bò, bắp, sống',
     'Thịt gà': 'thịt gà ta, tươi',
     'Thịt heo': 'thịt lợn, nạc, tươi',
+    'Thịt vịt': 'Thịt vịt, tươi',
     'Tôm': 'tôm biển, tươi',
     'Trứng': 'Trứng gà công nghiệp',
     'Trứng gà': 'Trứng gà công nghiệp',
@@ -213,4 +217,94 @@ class FoodRepository {
     }
     return nutritionArray;
   }
+
+  ServingUnitInfo calculateServingUnit({
+    required String mainGroup,
+    required double p100,
+    required double c100,
+    required double f100,
+    required double actualWeight,
+  }) {
+    final groupLower = mainGroup.toLowerCase();
+    
+    // 1. Nhóm đạm: 1 phần chuẩn cung cấp 7g Protein (Công thức 2.7)
+    if (groupLower.contains('đạm') || groupLower.contains('protein') || p100 >= 10.0) {
+      if (p100 > 0) {
+        final double mServing = 700.0 / p100;
+        final double count = actualWeight / mServing;
+        final String mServingStr = mServing.toStringAsFixed(0);
+        final String countStr = count.toStringAsFixed(1);
+        return ServingUnitInfo(
+          servingWeight: mServing,
+          servingCount: count,
+          groupName: 'Chất đạm',
+          standardDesc: '1 phần chuẩn = ${mServingStr}g (cung cấp 7g Đạm)',
+          summaryText: '≈ $countStr phần đạm chuẩn (1 phần = ${mServingStr}g)',
+        );
+      }
+    }
+    
+    // 2. Nhóm tinh bột / bột đường: 1 phần chuẩn cung cấp 20g Carbohydrate (Công thức 2.8)
+    if (groupLower.contains('đường') || groupLower.contains('bột') || groupLower.contains('carb') || c100 >= 15.0) {
+      if (c100 > 0) {
+        final double mServing = 2000.0 / c100;
+        final double count = actualWeight / mServing;
+        final String mServingStr = mServing.toStringAsFixed(0);
+        final String countStr = count.toStringAsFixed(1);
+        return ServingUnitInfo(
+          servingWeight: mServing,
+          servingCount: count,
+          groupName: 'Chất bột đường',
+          standardDesc: '1 phần chuẩn = ${mServingStr}g (cung cấp 20g Tinh bột)',
+          summaryText: '≈ $countStr phần tinh bột chuẩn (1 phần = ${mServingStr}g)',
+        );
+      }
+    }
+    
+    // 3. Nhóm chất béo: 1 phần chuẩn cung cấp 5g Lipid (Công thức 2.9)
+    if (groupLower.contains('béo') || groupLower.contains('fat') || groupLower.contains('lipid') || f100 >= 10.0) {
+      if (f100 > 0) {
+        final double mServing = 500.0 / f100;
+        final double count = actualWeight / mServing;
+        final String mServingStr = mServing.toStringAsFixed(0);
+        final String countStr = count.toStringAsFixed(1);
+        return ServingUnitInfo(
+          servingWeight: mServing,
+          servingCount: count,
+          groupName: 'Chất béo',
+          standardDesc: '1 phần chuẩn = ${mServingStr}g (cung cấp 5g Chất béo)',
+          summaryText: '≈ $countStr phần béo chuẩn (1 phần = ${mServingStr}g)',
+        );
+      }
+    }
+
+    // 4. Mặc định nhóm rau củ quả: 1 phần chuẩn = 80g
+    final double mServing = 80.0;
+    final double count = actualWeight / mServing;
+    final String countStr = count.toStringAsFixed(1);
+    return ServingUnitInfo(
+      servingWeight: mServing,
+      servingCount: count,
+      groupName: 'Rau củ quả',
+      standardDesc: '1 phần chuẩn = 80g',
+      summaryText: '≈ $countStr phần rau củ chuẩn (1 phần = 80g)',
+    );
+  }
+}
+
+
+class ServingUnitInfo {
+  final double servingWeight;
+  final double servingCount;
+  final String groupName;
+  final String standardDesc;
+  final String summaryText;
+
+  const ServingUnitInfo({
+    required this.servingWeight,
+    required this.servingCount,
+    required this.groupName,
+    required this.standardDesc,
+    required this.summaryText,
+  });
 }

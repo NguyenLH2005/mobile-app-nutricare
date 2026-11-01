@@ -247,6 +247,9 @@ class SyncController extends Notifier<AuthUserState> {
           'localId': s.id,
           'foodName': s.foodName,
           'weight': s.weight,
+          'servingUnits': s.servingUnits,
+          'consumptionRatio': s.consumptionRatio,
+          'logDate': s.logDate,
           'nutritionData': s.decodedNutrition,
           'mainGroup': s.mainGroup,
           'originalImageBase64': origBase64,
@@ -369,6 +372,9 @@ class SyncController extends Notifier<AuthUserState> {
               aiSuggestion: s['ai_suggestion'] ?? s['aiSuggestion'],
               foodName: s['food_name'] ?? s['foodName'] ?? 'Món ăn',
               weight: _parseNullableNum(s['weight']),
+              servingUnits: _parseNullableNum(s['serving_units'] ?? s['servingUnits']),
+              consumptionRatio: _parseNullableNum(s['consumption_ratio'] ?? s['consumptionRatio']) ?? 1.0,
+              logDate: s['log_date'] ?? s['logDate'],
               nutritionData: s['nutrition_data'] is String 
                   ? s['nutrition_data'] 
                   : jsonEncode(s['nutrition_data'] ?? []),

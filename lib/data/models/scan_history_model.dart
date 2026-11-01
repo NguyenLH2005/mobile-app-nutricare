@@ -11,6 +11,9 @@ class ScanHistory {
   final String? aiSuggestion;
   final String foodName;
   final double? weight;
+  final double? servingUnits; // Số đơn vị khẩu phần chuẩn quy đổi (S_j)
+  final double consumptionRatio; // Hệ số tiêu thụ gamma (mặc định 1.0)
+  final String? logDate; // Ngày tiêu thụ dạng YYYY-MM-DD
   final String nutritionData;
   final String mainGroup; // Nhóm dinh dưỡng chính (từ CSV)
   final DateTime createdAt;
@@ -28,6 +31,9 @@ class ScanHistory {
     this.aiSuggestion,
     required this.foodName,
     this.weight,
+    this.servingUnits,
+    this.consumptionRatio = 1.0,
+    this.logDate,
     required this.nutritionData,
     required this.mainGroup,
     required this.createdAt,
@@ -35,7 +41,11 @@ class ScanHistory {
     this.updatedAt,
   });
 
+  /// Khối lượng thực phẩm thực tế ăn vào: m_consumed = gamma * m_label
+  double get actualWeight => (weight ?? 100.0) * (consumptionRatio > 0 ? consumptionRatio : 1.0);
+
   Map<String, dynamic> toMap() {
+    final effectiveDate = logDate ?? createdAt.toIso8601String().substring(0, 10);
     return {
       'id': id,
       'original_image': originalImage,
@@ -47,6 +57,9 @@ class ScanHistory {
       'ai_suggestion': aiSuggestion,
       'food_name': foodName,
       'weight': weight,
+      'serving_units': servingUnits,
+      'consumption_ratio': consumptionRatio,
+      'log_date': effectiveDate,
       'nutrition_data': nutritionData,
       'main_group': mainGroup,
       'created_at': createdAt.toIso8601String(),
@@ -56,6 +69,13 @@ class ScanHistory {
   }
 
   factory ScanHistory.fromMap(Map<String, dynamic> map) {
+    DateTime created;
+    try {
+      created = map['created_at'] != null ? DateTime.parse(map['created_at']) : DateTime.now();
+    } catch (_) {
+      created = DateTime.now();
+    }
+
     return ScanHistory(
       id: map['id'],
       originalImage: map['original_image'] ?? '',
@@ -66,12 +86,15 @@ class ScanHistory {
       labelImageBase64: map['label_image_base64'],
       aiSuggestion: map['ai_suggestion'] ?? map['aiSuggestion'],
       foodName: map['food_name'] ?? 'Món ăn',
-      weight: map['weight'],
+      weight: map['weight'] != null ? (map['weight'] as num).toDouble() : null,
+      servingUnits: map['serving_units'] != null ? (map['serving_units'] as num).toDouble() : null,
+      consumptionRatio: map['consumption_ratio'] != null ? (map['consumption_ratio'] as num).toDouble() : 1.0,
+      logDate: map['log_date'] ?? created.toIso8601String().substring(0, 10),
       nutritionData: map['nutrition_data'] ?? '[]',
       mainGroup: map['main_group'] ?? 'Chưa phân loại',
-      createdAt: map['created_at'] != null ? DateTime.parse(map['created_at']) : DateTime.now(),
+      createdAt: created,
       isSynced: map['is_synced'] ?? 0,
-      updatedAt: map['updated_at'] != null ? DateTime.parse(map['updated_at']) : null,
+      updatedAt: map['updated_at'] != null ? DateTime.tryParse(map['updated_at']) : null,
     );
   }
 
@@ -86,6 +109,9 @@ class ScanHistory {
     String? aiSuggestion,
     String? foodName,
     double? weight,
+    double? servingUnits,
+    double? consumptionRatio,
+    String? logDate,
     String? nutritionData,
     String? mainGroup,
     DateTime? createdAt,
@@ -103,6 +129,9 @@ class ScanHistory {
       aiSuggestion: aiSuggestion ?? this.aiSuggestion,
       foodName: foodName ?? this.foodName,
       weight: weight ?? this.weight,
+      servingUnits: servingUnits ?? this.servingUnits,
+      consumptionRatio: consumptionRatio ?? this.consumptionRatio,
+      logDate: logDate ?? this.logDate,
       nutritionData: nutritionData ?? this.nutritionData,
       mainGroup: mainGroup ?? this.mainGroup,
       createdAt: createdAt ?? this.createdAt,
@@ -111,7 +140,13 @@ class ScanHistory {
     );
   }
 
-  List<dynamic> get decodedNutrition => jsonDecode(nutritionData);
+  List<dynamic> get decodedNutrition {
+    try {
+      return jsonDecode(nutritionData);
+    } catch (_) {
+      return [];
+    }
+  }
 
   static String formatWeightValue(double weight, {bool spaceBeforeUnit = true}) {
     final sep = spaceBeforeUnit ? ' ' : '';

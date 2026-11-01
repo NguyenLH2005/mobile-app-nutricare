@@ -27,12 +27,12 @@ class AIHelper {
     'Bạch tuộc', 'Bắp cải', 'Bầu', 'Bí đỏ', 'Bơ', 
     'Cà chua', 'Cá điêu hồng', 'Cá hồi', 'Cá lóc', 'Cá ngừ', 
     'Cà rốt', 'Cá thu', 'Cải xanh', 'Cam', 'Chôm chôm', 
-    'Chuối', 'Dâu tây', 'Đu đủ', 'Dưa hấu', 'Dưa leo', 
+    'Chuối', 'Cua', 'Dâu tây', 'Đu đủ', 'Dưa hấu', 'Dưa leo', 
     'Ếch', 'Hạnh nhân', 'Khổ qua', 'Khoai lang', 'Khoai tây', 
-    'Lê', 'Mực', 'Nấm đùi gà', 'Nấm kim châm', 'Nấm rơm', 
+    'Khóm', 'Lê', 'Mực', 'Nấm đùi gà', 'Nấm kim châm', 'Nấm rơm', 
     'Ngô', 'Nho', 'Óc chó', 'Ổi', 'Ớt chuông', 
     'Rau muống', 'Sầu riêng', 'Súp lơ', 'Táo', 'Thanh long', 
-    'Thịt bò', 'Thịt gà', 'Thịt heo', 'Tôm', 'Trứng', 
+    'Thịt bò', 'Thịt gà', 'Thịt heo', 'Thịt vịt', 'Tôm', 'Trứng', 
     'Vải', 'Xoài'
   ];
 
@@ -264,6 +264,10 @@ class AIHelper {
         }
       }
 
+      if (donGiaIndex != -1 && (klIndex == donGiaIndex || (klIndex - donGiaIndex).abs() <= 1)) {
+        klIndex = -1;
+      }
+
       String? weightCandidate;
       String context = "";
 
@@ -290,22 +294,9 @@ class AIHelper {
         }
       }
 
-      // Logic 2: Tìm từ vị trí Đơn giá
-      if (weightCandidate == null && donGiaIndex != -1) {
-        int end = min(lines.length, donGiaIndex + 5);
-        String dgContext = lines.sublist(max(0, donGiaIndex), end).join(" ");
-        final match = RegExp(r'(\d+[\.,]?\d*)\s*(g|kg|gram)', caseSensitive: false).firstMatch(dgContext);
-        if (match != null) {
-          String numStr = match.group(1)!.replaceAll(',', '.');
-          try {
-            double val = double.parse(numStr);
-            if ('.'.allMatches(numStr).length <= 1 && val >= 0.001 && val <= 5000) {
-              String valStr = (val == val.toInt()) ? val.toInt().toString() : val.toString().replaceAll(RegExp(r'0*$'), '').replaceAll(RegExp(r'\.$'), '');
-              weightCandidate = '$valStr${match.group(2)!.toUpperCase()}';
-            }
-          } catch (_) {}
-        }
-      }
+      // Logic 2: Theo Bảng 2.5 Mục 2.4.3, các số liệu thuộc khu vực Đơn giá (VD: 25.000 d/100g)
+      // là đơn vị tính giá, tuyệt đối KHÔNG lấy làm khối lượng tịnh của sản phẩm.
+      // Do đó, ta loại trừ toàn bộ ngữ cảnh đơn giá khỏi tập ứng viên khối lượng.
 
       // Logic 3: Chạy Regex vét máng
       weightCandidate ??= _extractByRegex(normalizedText);
@@ -347,6 +338,8 @@ class AIHelper {
 
     String vanBanSach = vanBanTho.replaceAll(RegExp(r'\b\d+[.,]\d+[.,]\d+\b'), '');
     vanBanSach = vanBanSach.replaceAll(RegExp(r'\b\d{6,}\b'), '');
+    // Loại trừ đơn giá kèm quy cách tính (VD: 25000d/100g hoặc /kg) theo Bảng 2.5 Mục 2.4.3
+    vanBanSach = vanBanSach.replaceAll(RegExp(r'(?:don\s*gia|gia)?[^\w]{0,5}\d+[.,\d]*\s*(?:d|vnd|dong)?\s*/\s*(?:100g|kg|g)', caseSensitive: false), '');
 
     final patternKw = RegExp(r'(?:khoi luong|trong luong|kl|tl)\s*(?:tinh)?[^\d]{0,15}?(\d+(?:[.,]\d+)?)\s*(g|kg|gr|k)?', caseSensitive: false);
     for (final m in patternKw.allMatches(vanBanSach)) {

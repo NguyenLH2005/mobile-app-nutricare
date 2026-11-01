@@ -14,6 +14,7 @@ import '../state/sync_controller.dart';
 
 import 'result_screen.dart';
 import 'edit_profile_screen.dart';
+import 'daily_progress_screen.dart';
 import '../widgets/full_screen_image.dart';
 
 class EggOption {
@@ -177,7 +178,7 @@ class _FoundObjectScreenState extends ConsumerState<FoundObjectScreen> {
         mainGroupStr: _currentData.mainGroup,
         foodName: _currentData.foodName,
         rawFoodData: rawFoodData,
-        weight: _currentData.weight,
+        weight: _currentData.actualWeight,
       );
       if (mounted) {
         setState(() {
@@ -508,6 +509,148 @@ class _FoundObjectScreenState extends ConsumerState<FoundObjectScreen> {
     );
   }
 
+  Future<void> _setConsumptionRatio(double newRatio) async {
+    final list = _currentData.decodedNutrition;
+    double p100 = 0, c100 = 0, f100 = 0;
+    for (var item in list) {
+      if (item['id'] == 'protein') p100 = (item['per_100g'] as num?)?.toDouble() ?? 0.0;
+      if (item['id'] == 'carb') c100 = (item['per_100g'] as num?)?.toDouble() ?? 0.0;
+      if (item['id'] == 'fat' || item['id'] == 'total_fat') f100 = (item['per_100g'] as num?)?.toDouble() ?? 0.0;
+    }
+    final actualW = (_currentData.weight ?? 100.0) * newRatio;
+    final servingInfo = ref.read(foodRepositoryProvider).calculateServingUnit(
+      mainGroup: _currentData.mainGroup,
+      p100: p100,
+      c100: c100,
+      f100: f100,
+      actualWeight: actualW,
+    );
+
+    final updatedData = _currentData.copyWith(
+      consumptionRatio: newRatio,
+      servingUnits: servingInfo.servingCount,
+      isSynced: 0,
+      updatedAt: DateTime.now(),
+    );
+
+    if (_currentData.id != null) {
+      await ref.read(historyControllerProvider.notifier).updateScan(updatedData);
+      ref.read(syncProvider.notifier).syncNow();
+    }
+
+    setState(() {
+      _currentData = updatedData;
+    });
+    _fetchSuggestion();
+  }
+
+  Future<void> _showCustomRatioDialog() async {
+    final textController = TextEditingController();
+    int mode = 0; // 0: %, 1: g
+
+    final result = await showDialog<double>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) {
+          final totalWeight = _currentData.weight ?? 100.0;
+          return AlertDialog(
+            title: const Text('Tùy chỉnh lượng ăn thực tế'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  children: [
+                    ChoiceChip(
+                      label: const Text('Theo % khay'),
+                      selected: mode == 0,
+                      onSelected: (_) => setDialogState(() => mode = 0),
+                    ),
+                    const SizedBox(width: 8),
+                    ChoiceChip(
+                      label: const Text('Theo số gam (g)'),
+                      selected: mode == 1,
+                      onSelected: (_) => setDialogState(() => mode = 1),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: textController,
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  decoration: InputDecoration(
+                    labelText: mode == 0 ? 'Tỷ lệ % (1 - 100)' : 'Khối lượng ăn (g)',
+                    hintText: mode == 0 ? 'Ví dụ: 30' : 'Ví dụ: 120',
+                    suffixText: mode == 0 ? '%' : 'g',
+                    border: const OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Tổng khối lượng trên nhãn: ${totalWeight.toStringAsFixed(0)}g',
+                  style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Hủy')),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(backgroundColor: Colors.green, foregroundColor: Colors.white),
+                onPressed: () {
+                  final val = double.tryParse(textController.text.trim().replaceAll(',', '.'));
+                  if (val == null || val <= 0) return;
+                  if (mode == 0) {
+                    final ratio = (val / 100.0).clamp(0.01, 1.0);
+                    Navigator.pop(ctx, ratio);
+                  } else {
+                    final ratio = (val / totalWeight).clamp(0.01, 2.0);
+                    Navigator.pop(ctx, ratio);
+                  }
+                },
+                child: const Text('Áp dụng'),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+
+    if (result != null && result > 0) {
+      await _setConsumptionRatio(result);
+    }
+  }
+
+  Widget _buildRatioChip(double ratio, String label) {
+    final bool isSelected = (_currentData.consumptionRatio - ratio).abs() < 0.02;
+    return ChoiceChip(
+      label: Text(label),
+      selected: isSelected,
+      selectedColor: Colors.green.shade100,
+      labelStyle: TextStyle(
+        fontSize: 12,
+        fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+        color: isSelected ? Colors.green.shade900 : Colors.black87,
+      ),
+      onSelected: (_) => _setConsumptionRatio(ratio),
+    );
+  }
+
+  Widget _buildCustomRatioChip() {
+    final bool isStandard = [0.25, 0.50, 0.75, 1.0].any((r) => (_currentData.consumptionRatio - r).abs() < 0.02);
+    return ActionChip(
+      avatar: const Icon(Icons.edit, size: 14, color: Colors.blue),
+      label: Text(
+        isStandard ? 'Tùy chỉnh...' : '${(_currentData.consumptionRatio * 100).round()}%',
+        style: TextStyle(
+          fontSize: 12,
+          fontWeight: isStandard ? FontWeight.normal : FontWeight.bold,
+          color: Colors.blue.shade900,
+        ),
+      ),
+      backgroundColor: isStandard ? Colors.blue.shade50 : Colors.blue.shade100,
+      onPressed: _showCustomRatioDialog,
+    );
+  }
+
   Future<void> _editWeight() async {
     TextEditingController controller = TextEditingController(text: _currentData.weight?.toString() ?? '100');
     final newWeightStr = await showDialog<String>(
@@ -672,20 +815,40 @@ class _FoundObjectScreenState extends ConsumerState<FoundObjectScreen> {
   @override
   Widget build(BuildContext context) {
     final nutritionList = _currentData.decodedNutrition;
-    
+    final double cRatio = _currentData.consumptionRatio > 0 ? _currentData.consumptionRatio : 1.0;
+    final double actualW = _currentData.actualWeight;
+
     Map<String, dynamic> energy = {'per_label': 0, 'unit': 'kcal'};
     Map<String, dynamic> protein = {'per_label': 0, 'unit': 'g'};
     Map<String, dynamic> fat = {'per_label': 0, 'unit': 'g'};
     Map<String, dynamic> carb = {'per_label': 0, 'unit': 'g'};
     Map<String, dynamic> fiber = {'per_label': 0, 'unit': 'g'};
 
+    double p100 = 0, c100 = 0, f100 = 0;
     for (var item in nutritionList) {
       if (item['id'] == 'energy') energy = item;
-      if (item['id'] == 'protein') protein = item;
-      if (item['id'] == 'fat') fat = item;
-      if (item['id'] == 'carb') carb = item;
+      if (item['id'] == 'protein') {
+        protein = item;
+        p100 = (item['per_100g'] as num?)?.toDouble() ?? 0.0;
+      }
+      if (item['id'] == 'fat' || item['id'] == 'total_fat') {
+        fat = item;
+        f100 = (item['per_100g'] as num?)?.toDouble() ?? 0.0;
+      }
+      if (item['id'] == 'carb') {
+        carb = item;
+        c100 = (item['per_100g'] as num?)?.toDouble() ?? 0.0;
+      }
       if (item['id'] == 'fiber') fiber = item;
     }
+
+    final servingInfo = ref.read(foodRepositoryProvider).calculateServingUnit(
+      mainGroup: _currentData.mainGroup,
+      p100: p100,
+      c100: c100,
+      f100: f100,
+      actualWeight: actualW,
+    );
 
     return Scaffold(
       backgroundColor: const Color(0xFFF7F9FC),
@@ -694,6 +857,20 @@ class _FoundObjectScreenState extends ConsumerState<FoundObjectScreen> {
         elevation: 0,
         title: const Text('Kết quả quét', style: TextStyle(color: Colors.black87, fontWeight: FontWeight.bold)),
         iconTheme: const IconThemeData(color: Colors.black87),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.pie_chart_outline, color: Colors.green),
+            tooltip: 'Tiến trình dinh dưỡng ngày',
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => DailyProgressScreen(initialDate: _currentData.logDate),
+                ),
+              );
+            },
+          ),
+        ],
       ),
       body: SingleChildScrollView(
         child: Padding(
@@ -813,6 +990,116 @@ class _FoundObjectScreenState extends ConsumerState<FoundObjectScreen> {
                   ],
                 ),
               ),
+              const SizedBox(height: 12),
+
+              // 2.1. ĐƠN VỊ KHẨU PHẦN CHUẨN (Standard Food Serving Unit - Công thức 2.7 - 2.9)
+              Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF0FDF4),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.green.shade200),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: Colors.green.shade100,
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(Icons.scale_outlined, color: Colors.green, size: 20),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'QUY ĐỔI KHẨU PHẦN CHUẨN (${servingInfo.groupName.toUpperCase()})',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.green.shade800,
+                              letterSpacing: 0.5,
+                            ),
+                          ),
+                          const SizedBox(height: 3),
+                          Text(
+                            servingInfo.summaryText,
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.green.shade900,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            servingInfo.standardDesc,
+                            style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+
+              // 2.2. THANH CHỌN HỆ SỐ TIÊU THỤ THỰC TẾ (gamma in (0, 1] - Công thức 2.10 - 2.12)
+              Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  boxShadow: [
+                    BoxShadow(color: Colors.black.withValues(alpha: 0.02), blurRadius: 8, offset: const Offset(0, 3)),
+                  ],
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Row(
+                          children: [
+                            Icon(Icons.pie_chart_outline, size: 18, color: Color(0xFF1B233A)),
+                            SizedBox(width: 6),
+                            Text(
+                              'Khẩu phần tiêu thụ thực tế (γ)',
+                              style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFF1B233A)),
+                            ),
+                          ],
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: Colors.blue.shade50,
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(
+                            'Ăn ${actualW.toStringAsFixed(0)}g (${(cRatio * 100).round()}%)',
+                            style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.blue.shade800),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 6,
+                      children: [
+                        _buildRatioChip(0.25, '1/4 (25%)'),
+                        _buildRatioChip(0.50, '1/2 (50%)'),
+                        _buildRatioChip(0.75, '3/4 (75%)'),
+                        _buildRatioChip(1.00, 'Hết khay (100%)'),
+                        _buildCustomRatioChip(),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
               const SizedBox(height: 16),
 
               // 3. Card Năng lượng
@@ -826,7 +1113,7 @@ class _FoundObjectScreenState extends ConsumerState<FoundObjectScreen> {
                       children: [
                         const Text('Tổng Năng Lượng', style: TextStyle(fontSize: 14, color: Colors.black87)),
                         const SizedBox(height: 8),
-                        Text('${energy['per_label']} ${energy['unit'] == 'kcal' ? 'Kcal' : energy['unit']}', style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Color(0xFFD32F2F))),
+                        Text('${(((energy['per_label'] as num?)?.toDouble() ?? 0) * cRatio).toStringAsFixed(0)} ${energy['unit'] == 'kcal' ? 'Kcal' : energy['unit']}', style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Color(0xFFD32F2F))),
                       ],
                     ),
                   ],
@@ -834,20 +1121,20 @@ class _FoundObjectScreenState extends ConsumerState<FoundObjectScreen> {
               ),
               const SizedBox(height: 12),
 
-              // 4. Grid 4 chất
+              // 4. Grid 4 chất (Đã nhân hệ số tiêu thụ thực tế gamma)
               Row(
                 children: [
-                  Expanded(child: _buildNutrientCard('Protein', '${protein['per_label']}${protein['unit']}', Colors.purple)),
+                  Expanded(child: _buildNutrientCard('Protein', '${(((protein['per_label'] as num?)?.toDouble() ?? 0) * cRatio).toStringAsFixed(1)}${protein['unit']}', Colors.purple)),
                   const SizedBox(width: 12),
-                  Expanded(child: _buildNutrientCard('Chất béo (Fat)', '${fat['per_label']}${fat['unit']}', Colors.orange)),
+                  Expanded(child: _buildNutrientCard('Chất béo (Fat)', '${(((fat['per_label'] as num?)?.toDouble() ?? 0) * cRatio).toStringAsFixed(1)}${fat['unit']}', Colors.orange)),
                 ],
               ),
               const SizedBox(height: 12),
               Row(
                 children: [
-                  Expanded(child: _buildNutrientCard('Carb', '${carb['per_label']}${carb['unit']}', Colors.blue)),
+                  Expanded(child: _buildNutrientCard('Carb', '${(((carb['per_label'] as num?)?.toDouble() ?? 0) * cRatio).toStringAsFixed(1)}${carb['unit']}', Colors.blue)),
                   const SizedBox(width: 12),
-                  Expanded(child: _buildNutrientCard('Chất xơ', '${fiber['per_label']}${fiber['unit']}', Colors.green)),
+                  Expanded(child: _buildNutrientCard('Chất xơ', '${(((fiber['per_label'] as num?)?.toDouble() ?? 0) * cRatio).toStringAsFixed(1)}${fiber['unit']}', Colors.green)),
                 ],
               ),
               const SizedBox(height: 32),
@@ -1069,6 +1356,33 @@ class _FoundObjectScreenState extends ConsumerState<FoundObjectScreen> {
                     ),
                   );
                 }
+              ),
+              const SizedBox(height: 20),
+
+              // NÚT CHUYỂN SANG TIẾN TRÌNH DINH DƯỠNG NGÀY
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.green,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => DailyProgressScreen(initialDate: _currentData.logDate),
+                      ),
+                    );
+                  },
+                  icon: const Icon(Icons.pie_chart_outline),
+                  label: const Text(
+                    'Xem Tiến trình Dinh dưỡng Ngày Hôm Nay',
+                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+                  ),
+                ),
               ),
               const SizedBox(height: 40),
             ],

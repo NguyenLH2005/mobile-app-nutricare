@@ -21,7 +21,7 @@ class DatabaseHelper {
 
     return await openDatabase(
       path,
-      version: 10,
+      version: 11,
       onCreate: _createDB,
       onUpgrade: (db, oldVersion, newVersion) async {
         if (oldVersion < 8) {
@@ -50,6 +50,17 @@ class DatabaseHelper {
             await db.execute("ALTER TABLE scan_history ADD COLUMN ai_suggestion TEXT");
           } catch (_) {}
         }
+        if (oldVersion < 11) {
+          try {
+            await db.execute("ALTER TABLE scan_history ADD COLUMN serving_units REAL");
+          } catch (_) {}
+          try {
+            await db.execute("ALTER TABLE scan_history ADD COLUMN consumption_ratio REAL DEFAULT 1.0");
+          } catch (_) {}
+          try {
+            await db.execute("ALTER TABLE scan_history ADD COLUMN log_date TEXT");
+          } catch (_) {}
+        }
       },
     );
   }
@@ -67,6 +78,9 @@ class DatabaseHelper {
       ai_suggestion TEXT,
       food_name TEXT NOT NULL,
       weight REAL,
+      serving_units REAL,
+      consumption_ratio REAL NOT NULL DEFAULT 1.0,
+      log_date TEXT,
       nutrition_data TEXT NOT NULL,
       main_group TEXT NOT NULL,
       created_at TEXT NOT NULL,
@@ -124,6 +138,17 @@ class DatabaseHelper {
   Future<List<ScanHistory>> getAllScans() async {
     final db = await instance.database;
     final result = await db.query('scan_history', orderBy: 'created_at DESC');
+    return result.map((map) => ScanHistory.fromMap(map)).toList();
+  }
+
+  Future<List<ScanHistory>> getDailyScans(String dateStr) async {
+    final db = await instance.database;
+    final result = await db.query(
+      'scan_history',
+      where: 'log_date = ? OR created_at LIKE ?',
+      whereArgs: [dateStr, '$dateStr%'],
+      orderBy: 'created_at DESC',
+    );
     return result.map((map) => ScanHistory.fromMap(map)).toList();
   }
 
