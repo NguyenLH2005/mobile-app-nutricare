@@ -206,7 +206,9 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
                 (e) => e['id'] == 'energy',
                 orElse: () => {'per_label': 0},
               );
-              final kcal = energyItem['per_label'];
+              final double cRatio = item.consumptionRatio > 0 ? item.consumptionRatio : 1.0;
+              final double rawKcal = (energyItem['per_label'] as num?)?.toDouble() ?? 0.0;
+              final kcal = (rawKcal * cRatio).toStringAsFixed(0);
 
               return InkWell(
                 onLongPress: () {
@@ -284,9 +286,12 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
                                     const SizedBox(height: 4),
                                     if (item.weight != null)
                                       Text(
-                                        item.formatWeight(spaceBeforeUnit: false),
+                                        item.consumptionRatio < 0.99
+                                            ? 'Ăn: ${item.actualWeight.toStringAsFixed(0)}g (${(item.consumptionRatio * 100).round()}% khay)'
+                                            : item.formatWeight(spaceBeforeUnit: false),
                                         style: TextStyle(
-                                          color: Colors.grey.shade600,
+                                          color: item.consumptionRatio < 0.99 ? Colors.green.shade700 : Colors.grey.shade600,
+                                          fontWeight: item.consumptionRatio < 0.99 ? FontWeight.w600 : FontWeight.normal,
                                         ),
                                       ),
                                   ],
