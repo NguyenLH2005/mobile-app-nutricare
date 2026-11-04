@@ -616,12 +616,12 @@ class _DailyProgressScreenState extends ConsumerState<DailyProgressScreen> {
                   color: Colors.green.shade100,
                   shape: BoxShape.circle,
                 ),
-                child: const Icon(Icons.auto_awesome, color: Colors.green, size: 18),
+                child: const Icon(Icons.balance, color: Colors.green, size: 18),
               ),
               const SizedBox(width: 8),
               const Expanded(
                 child: Text(
-                  'GỢI Ý BÙ ĐẮP KHẨU PHẦN CHUẨN (N_equiv)',
+                  'QUY ĐỔI PHẦN ĂN CẦN BỔ SUNG',
                   style: TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.bold,
@@ -646,7 +646,7 @@ class _DailyProgressScreenState extends ConsumerState<DailyProgressScreen> {
                 child: _buildEquivItem(
                   title: 'Phần Đạm',
                   count: equivProtein,
-                  example: '≈ 1 quả trứng hoặc 80g tôm/thịt',
+                  example: '≈ 1 quả trứng hoặc 80g thịt heo',
                   color: Colors.purple,
                 ),
               ),
@@ -655,7 +655,7 @@ class _DailyProgressScreenState extends ConsumerState<DailyProgressScreen> {
                 child: _buildEquivItem(
                   title: 'Phần Tinh bột',
                   count: equivCarb,
-                  example: '≈ 1/2 bát cơm hoặc 1 củ khoai',
+                  example: '≈ 1/2 bát cơm hoặc 1 củ khoai tây',
                   color: Colors.blue,
                 ),
               ),
@@ -664,7 +664,7 @@ class _DailyProgressScreenState extends ConsumerState<DailyProgressScreen> {
                 child: _buildEquivItem(
                   title: 'Phần Béo',
                   count: equivFat,
-                  example: '≈ 1 thìa dầu hoặc 10g hạt',
+                  example: '≈ 1 thìa dầu ăn hoặc 10g các loại hạt',
                   color: Colors.orange,
                 ),
               ),

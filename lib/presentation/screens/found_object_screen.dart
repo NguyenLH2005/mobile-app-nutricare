@@ -108,9 +108,7 @@ class _FoundObjectScreenState extends ConsumerState<FoundObjectScreen> {
         if (_isEggFood) {
           await _showEggSelectionModal();
         }
-        if (_suggestionText == null && !_isLoadingSuggestion) {
-          _fetchSuggestion();
-        }
+        // Chỉ nạp khi người dùng chủ động nhấn nút để tiết kiệm token
       });
     }
   }
@@ -238,7 +236,6 @@ class _FoundObjectScreenState extends ConsumerState<FoundObjectScreen> {
       setState(() {
         _currentData = updatedData;
       });
-      _fetchSuggestion();
     }
   }
 
@@ -540,7 +537,6 @@ class _FoundObjectScreenState extends ConsumerState<FoundObjectScreen> {
     setState(() {
       _currentData = updatedData;
     });
-    _fetchSuggestion();
   }
 
   Future<void> _showCustomRatioDialog() async {
@@ -591,7 +587,11 @@ class _FoundObjectScreenState extends ConsumerState<FoundObjectScreen> {
               ],
             ),
             actions: [
-              TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Hủy')),
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, 1.0),
+                child: const Text('Đặt lại 100% (Nguyên khay)'),
+              ),
+              TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Đóng')),
               ElevatedButton(
                 style: ElevatedButton.styleFrom(backgroundColor: Colors.green, foregroundColor: Colors.white),
                 onPressed: () {
@@ -629,7 +629,13 @@ class _FoundObjectScreenState extends ConsumerState<FoundObjectScreen> {
         fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
         color: isSelected ? Colors.green.shade900 : Colors.black87,
       ),
-      onSelected: (_) => _setConsumptionRatio(ratio),
+      onSelected: (selected) {
+        if (selected) {
+          _setConsumptionRatio(ratio);
+        } else {
+          _setConsumptionRatio(1.0);
+        }
+      },
     );
   }
 
@@ -691,7 +697,6 @@ class _FoundObjectScreenState extends ConsumerState<FoundObjectScreen> {
         setState(() {
           _currentData = updatedData;
         });
-        _fetchSuggestion();
       }
     }
   }
@@ -1039,9 +1044,9 @@ class _FoundObjectScreenState extends ConsumerState<FoundObjectScreen> {
                         const SizedBox(width: 6),
                         const Expanded(
                           child: Text(
-                            'Khẩu phần tiêu thụ thực tế (γ)',
+                            'Khẩu phần ăn thực tế',
                             style: TextStyle(
-                              fontSize: 13.5,
+                              fontSize: 14,
                               fontWeight: FontWeight.bold,
                               color: Color(0xFF1B233A),
                             ),
@@ -1053,14 +1058,32 @@ class _FoundObjectScreenState extends ConsumerState<FoundObjectScreen> {
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                           decoration: BoxDecoration(
-                            color: Colors.blue.shade50,
+                            color: cRatio < 0.99 ? Colors.blue.shade50 : Colors.grey.shade100,
                             borderRadius: BorderRadius.circular(6),
+                            border: Border.all(color: cRatio < 0.99 ? Colors.blue.shade200 : Colors.grey.shade300),
                           ),
                           child: Text(
-                            'Ăn ${actualW.toStringAsFixed(0)}g (${(cRatio * 100).round()}%)',
-                            style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.blue.shade800),
+                            cRatio < 0.99
+                                ? 'Ăn ${actualW.toStringAsFixed(0)}g (${(cRatio * 100).round()}%)'
+                                : 'Nguyên khay (${actualW.toStringAsFixed(0)}g)',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              color: cRatio < 0.99 ? Colors.blue.shade800 : Colors.grey.shade700,
+                            ),
                           ),
                         ),
+                        if (cRatio < 0.99) ...[
+                          const SizedBox(width: 4),
+                          InkWell(
+                            onTap: () => _setConsumptionRatio(1.0),
+                            borderRadius: BorderRadius.circular(12),
+                            child: const Padding(
+                              padding: EdgeInsets.all(4),
+                              child: Icon(Icons.close, size: 16, color: Colors.grey),
+                            ),
+                          ),
+                        ],
                       ],
                     ),
                     const SizedBox(height: 10),
@@ -1290,8 +1313,8 @@ class _FoundObjectScreenState extends ConsumerState<FoundObjectScreen> {
                           const SizedBox(height: 14),
                           ElevatedButton.icon(
                             onPressed: _fetchSuggestion,
-                            icon: const Icon(Icons.refresh, color: Colors.white, size: 18),
-                            label: const Text('Tra cứu tư vấn dinh dưỡng', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                            icon: const Icon(Icons.auto_awesome, color: Colors.white, size: 18),
+                            label: const Text('Nhận tư vấn từ Chuyên gia AI', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
                             style: ElevatedButton.styleFrom(
                               backgroundColor: Colors.green,
                               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
