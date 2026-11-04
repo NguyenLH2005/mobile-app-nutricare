@@ -1034,18 +1034,22 @@ class _FoundObjectScreenState extends ConsumerState<FoundObjectScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        const Row(
-                          children: [
-                            Icon(Icons.pie_chart_outline, size: 18, color: Color(0xFF1B233A)),
-                            SizedBox(width: 6),
-                            Text(
-                              'Khẩu phần tiêu thụ thực tế (γ)',
-                              style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFF1B233A)),
+                        const Icon(Icons.pie_chart_outline, size: 18, color: Color(0xFF1B233A)),
+                        const SizedBox(width: 6),
+                        const Expanded(
+                          child: Text(
+                            'Khẩu phần tiêu thụ thực tế (γ)',
+                            style: TextStyle(
+                              fontSize: 13.5,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF1B233A),
                             ),
-                          ],
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
                         ),
+                        const SizedBox(width: 8),
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                           decoration: BoxDecoration(
