@@ -375,22 +375,22 @@ class _DailyProgressScreenState extends ConsumerState<DailyProgressScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Row(
-                children: [
-                  Icon(Icons.local_fire_department, color: Colors.deepOrange, size: 22),
-                  SizedBox(width: 8),
-                  Text(
-                    'Năng lượng nạp vào (Calories)',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF1B233A),
-                    ),
+              const Icon(Icons.local_fire_department, color: Colors.deepOrange, size: 22),
+              const SizedBox(width: 8),
+              const Expanded(
+                child: Text(
+                  'Năng lượng nạp vào (Calories)',
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF1B233A),
                   ),
-                ],
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
+              const SizedBox(width: 8),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
@@ -799,17 +799,26 @@ class _DailyProgressScreenState extends ConsumerState<DailyProgressScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text(
-              'Thực phẩm đã ghi nhận (${_dailyScans.length})',
-              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF1B233A)),
-            ),
-            if (_dailyScans.isNotEmpty)
-              Text(
-                'Chạm vào món để xem chi tiết',
-                style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+            Expanded(
+              child: Text(
+                'Thực phẩm đã ghi nhận (${_dailyScans.length})',
+                style: const TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF1B233A),
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
+            ),
+            if (_dailyScans.isNotEmpty) ...[
+              const SizedBox(width: 8),
+              Text(
+                'Chạm để xem chi tiết',
+                style: TextStyle(fontSize: 11.5, color: Colors.grey.shade600),
+              ),
+            ],
           ],
         ),
         const SizedBox(height: 10),
@@ -933,7 +942,8 @@ class _DailyProgressScreenState extends ConsumerState<DailyProgressScreen> {
                     ),
                   ),
                   const SizedBox(height: 2),
-                  Row(
+                  Wrap(
+                    crossAxisAlignment: WrapCrossAlignment.center,
                     children: [
                       Text(
                         'Ăn: ${scan.actualWeight.toStringAsFixed(0)}g',
