@@ -540,8 +540,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             subtitle: 'Năng lượng chuyển hóa cơ bản',
             value: '${profile.bmr.toStringAsFixed(0)} kcal/ngày',
             explanationKey: 'bmr',
-            definitionText: 'BMR là lượng năng lượng tối thiểu (kcal) mà cơ thể cần để duy trì các chức năng sinh tồn cơ bản nhất khi bạn ở trạng thái nghỉ ngơi hoàn toàn suốt 24 giờ. Năng lượng này phục vụ cho: tim đập, hô hấp, não điều khiển, thận lọc máu, duy trì thân nhiệt và tái tạo tế bào.',
-            usageText: 'BMR dùng để xác định ngưỡng sàn an toàn — bạn tuyệt đối không nên ăn dưới mức này trong thời gian dài để tránh suy nhược, teo cơ và làm chậm quá trình trao đổi chất.',
+            definitionText: 'Năng lượng tối thiểu cơ thể cần để duy trì sự sống khi nghỉ ngơi suốt 24 giờ.',
+            usageText: 'Ngưỡng sàn calo an toàn, tuyệt đối không ăn dưới mức này để tránh suy nhược và hạ trao đổi chất.',
           ),
 
           // 2. Hàng TDEE
@@ -550,8 +550,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             subtitle: 'Tổng năng lượng tiêu hao mỗi ngày',
             value: '${profile.tdee.toStringAsFixed(0)} kcal/ngày',
             explanationKey: 'tdee',
-            definitionText: 'TDEE là tổng lượng calo thực tế mà cơ thể bạn đốt cháy trong 1 ngày, bao gồm BMR cộng với năng lượng dùng cho sinh hoạt, đi lại, làm việc, tập luyện thể thao và nhiệt sinh ra để tiêu hóa thức ăn.',
-            usageText: 'TDEE dùng để làm mốc hòa vốn — nếu bạn nạp vào lượng calo bằng đúng mức TDEE mỗi ngày thì cân nặng sẽ được giữ nguyên hoàn toàn.',
+            definitionText: 'Tổng lượng calo cơ thể đốt cháy mỗi ngày, gồm BMR, vận động và tiêu hóa thức ăn.',
+            usageText: 'Mốc calo chuẩn để giữ nguyên cân nặng hiện tại.',
           ),
 
           // 3. Hàng Calo Mục Tiêu
@@ -561,8 +561,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             value: '${profile.targetCalories.toStringAsFixed(0)} kcal/ngày',
             explanationKey: 'target',
             valueColor: Colors.green.shade800,
-            definitionText: 'Calo Mục Tiêu là lượng calo bạn chủ động nạp vào qua thức ăn và đồ uống mỗi ngày dựa trên TDEE và mục tiêu thể hình của bạn.',
-            usageText: 'Calo Mục Tiêu dùng để điều chỉnh vóc dáng một cách an toàn và bền vững (giảm mỡ thâm hụt khoảng 500 kcal, tăng cân thặng dư 300-500 kcal hoặc duy trì cân nặng).',
+            definitionText: 'Lượng calo nạp vào mỗi ngày theo kế hoạch thể hình của bạn.',
+            usageText: 'Tạo mức thâm hụt để giảm cân hoặc thặng dư calo để tăng cân an toàn so với TDEE.',
           ),
         ],
       ),
