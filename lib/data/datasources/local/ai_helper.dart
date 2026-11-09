@@ -139,7 +139,7 @@ class AIHelper {
       double h = isTransposed ? output[0][index][3] : output[0][3][index];
 
       // Nếu model trả về tọa độ chuẩn hóa [0.0, 1.0], nhân lên tỷ lệ inputSize
-      if (w <= 1.0 && h <= 1.0) {
+      if (w <= 2.0 && h <= 2.0) {
         xc *= inputSize;
         yc *= inputSize;
         w *= inputSize;
