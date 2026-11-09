@@ -77,6 +77,8 @@ class _FoundObjectScreenState extends ConsumerState<FoundObjectScreen> {
   bool _isLoadingSuggestion = false;
   String? _suggestionError;
   bool _isAddedToMenu = false;
+  final TextEditingController _eggPortionController = TextEditingController();
+  double _eggEatenCount = 1.0;
 
 
   bool get _isEggFood {
@@ -102,6 +104,13 @@ class _FoundObjectScreenState extends ConsumerState<FoundObjectScreen> {
     final todayStr = DateTime.now().toIso8601String().substring(0, 10);
     final scanDate = _currentData.logDate ?? _currentData.createdAt.toIso8601String().substring(0, 10);
     _isAddedToMenu = _currentData.id != null && scanDate == todayStr;
+    if (_isEggFood) {
+      _eggEatenCount = _currentData.consumptionRatio;
+      if (_eggEatenCount <= 0) _eggEatenCount = 1.0;
+      _eggPortionController.text = _eggEatenCount == _eggEatenCount.roundToDouble()
+          ? _eggEatenCount.toInt().toString()
+          : _eggEatenCount.toString();
+    }
 
     if (widget.isFromScan) {
       WidgetsBinding.instance.addPostFrameCallback((_) async {
@@ -114,7 +123,34 @@ class _FoundObjectScreenState extends ConsumerState<FoundObjectScreen> {
 
   @override
   void dispose() {
+    _eggPortionController.dispose();
     super.dispose();
+  }
+
+  void _onEggPortionChanged(String val) {
+    final parsed = double.tryParse(val.trim().replaceAll(',', '.'));
+    if (parsed != null && parsed > 0) {
+      _eggEatenCount = parsed;
+      _setConsumptionRatio(parsed, fromEggInput: true);
+    }
+  }
+
+  void _incrementEggPortion() {
+    _eggEatenCount = _eggEatenCount + 0.5;
+    _eggPortionController.text = _eggEatenCount == _eggEatenCount.roundToDouble()
+        ? _eggEatenCount.toInt().toString()
+        : _eggEatenCount.toString();
+    _setConsumptionRatio(_eggEatenCount, fromEggInput: true);
+  }
+
+  void _decrementEggPortion() {
+    if (_eggEatenCount > 0.5) {
+      _eggEatenCount = _eggEatenCount - 0.5;
+      _eggPortionController.text = _eggEatenCount == _eggEatenCount.roundToDouble()
+          ? _eggEatenCount.toInt().toString()
+          : _eggEatenCount.toString();
+      _setConsumptionRatio(_eggEatenCount, fromEggInput: true);
+    }
   }
 
   Future<void> _handleAddToMenu() async {
@@ -437,7 +473,7 @@ class _FoundObjectScreenState extends ConsumerState<FoundObjectScreen> {
     );
   }
 
-  Future<void> _setConsumptionRatio(double newRatio) async {
+  Future<void> _setConsumptionRatio(double newRatio, {bool fromEggInput = false}) async {
     final list = _currentData.decodedNutrition;
     double p100 = 0, c100 = 0, f100 = 0;
     for (var item in list) {
@@ -468,6 +504,12 @@ class _FoundObjectScreenState extends ConsumerState<FoundObjectScreen> {
 
     setState(() {
       _currentData = updatedData;
+      if (!fromEggInput && _isEggFood) {
+        _eggEatenCount = newRatio;
+        _eggPortionController.text = _eggEatenCount == _eggEatenCount.roundToDouble()
+            ? _eggEatenCount.toInt().toString()
+            : _eggEatenCount.toString();
+      }
     });
   }
 
@@ -953,7 +995,7 @@ class _FoundObjectScreenState extends ConsumerState<FoundObjectScreen> {
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),
-                        if (cRatio < 0.99) ...[
+                        if (cRatio < 0.99 || (_isEggFood && (_eggEatenCount - 1.0).abs() > 0.01)) ...[
                           InkWell(
                             onTap: () => _setConsumptionRatio(1.0),
                             borderRadius: BorderRadius.circular(12),
@@ -974,18 +1016,70 @@ class _FoundObjectScreenState extends ConsumerState<FoundObjectScreen> {
                     ),
                     const SizedBox(height: 10),
 
-                    // Các nút chọn phần trăm gọn gàng (không phân số)
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 6,
-                      children: [
-                        _buildRatioChip(0.25, '25%'),
-                        _buildRatioChip(0.50, '50%'),
-                        _buildRatioChip(0.75, '75%'),
-                        _buildRatioChip(1.00, '100%'),
-                        _buildCustomRatioChip(),
-                      ],
-                    ),
+                    if (_isEggFood) ...[
+                      // Ô nhập số cho người dùng tự nhập số quả thực tế (hỗ trợ số thập phân, nút cộng trừ ở bên phải)
+                      Row(
+                        children: [
+                          Expanded(
+                            child: TextField(
+                              controller: _eggPortionController,
+                              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                              decoration: InputDecoration(
+                                isDense: true,
+                                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                                labelText: 'Số quả ăn thực tế',
+                                suffixText: 'quả',
+                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                              ),
+                              onChanged: _onEggPortionChanged,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Container(
+                            decoration: BoxDecoration(
+                              border: Border.all(color: Colors.grey.shade300),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                IconButton(
+                                  icon: const Icon(Icons.remove, size: 18),
+                                  onPressed: _decrementEggPortion,
+                                  padding: const EdgeInsets.all(8),
+                                  constraints: const BoxConstraints(),
+                                ),
+                                Container(width: 1, height: 24, color: Colors.grey.shade300),
+                                IconButton(
+                                  icon: const Icon(Icons.add, size: 18),
+                                  onPressed: _incrementEggPortion,
+                                  padding: const EdgeInsets.all(8),
+                                  constraints: const BoxConstraints(),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        'Ăn ${_eggEatenCount.toStringAsFixed(1).replaceAll('.0', '')} quả trứng (tương đương ${actualW.toStringAsFixed(0)}g)',
+                        style: TextStyle(fontSize: 12, color: Colors.grey.shade700, fontWeight: FontWeight.w500),
+                      ),
+                    ] else ...[
+                      // Các nút chọn phần trăm gọn gàng (không phân số)
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 6,
+                        children: [
+                          _buildRatioChip(0.25, '25%'),
+                          _buildRatioChip(0.50, '50%'),
+                          _buildRatioChip(0.75, '75%'),
+                          _buildRatioChip(1.00, '100%'),
+                          _buildCustomRatioChip(),
+                        ],
+                      ),
+                    ],
 
                     const SizedBox(height: 14),
 
