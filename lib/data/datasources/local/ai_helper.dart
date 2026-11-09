@@ -37,13 +37,17 @@ class AIHelper {
   ];
 
   Future<void> init() async {
-    _cropInterpreter ??= await Interpreter.fromAsset('assets/models/crop_model.tflite');
+    _cropInterpreter ??= await Interpreter.fromAsset('assets/models/yolo26_safe_int8.tflite');
     _classifyInterpreter ??= await Interpreter.fromAsset('assets/models/classify_model.tflite');
   }
 
   /// 1. CHẠY MODEL NHẬN DIỆN VÀ CẮT ẢNH
   Future<Map<String, String?>> detectAndCrop(String imagePath) async {
     await init();
+
+    // Tự động nhận diện kích thước đầu vào từ chính mô hình (ví dụ: [1, 3, 640, 640] -> 640)
+    final inputShape = _cropInterpreter!.getInputTensor(0).shape;
+    final int inputSize = inputShape.length >= 4 ? inputShape[2] : 640;
     
     // Đọc ảnh gốc và xử lý Tensor trên Isolate (Luồng nền) để không làm đơ UI
     final isolateResult = await Isolate.run(() {
@@ -53,7 +57,6 @@ class AIHelper {
 
       final int origW = originalImage.width;
       final int origH = originalImage.height;
-      final int inputSize = 512;
       
       img.Image resizedImage = img.copyResize(
         originalImage,
@@ -96,7 +99,7 @@ class AIHelper {
     final int origW = isolateResult['origW'] as int;
     final int origH = isolateResult['origH'] as int;
     final List<List<List<List<double>>>> input = isolateResult['input'] as List<List<List<List<double>>>>;
-    final int inputSize = isolateResult['inputSize'] as int;
+
 
     // Lấy output tensor shape để tạo mảng chứa kết quả
     final outputShape = _cropInterpreter!.getOutputTensor(0).shape;
@@ -128,17 +131,14 @@ class AIHelper {
       }
     }
 
-    if (maxFoodIndex == -1) {
-      throw Exception("Không tìm thấy món ăn nào trong ảnh!");
-    }
-
-    // Hàm phụ trợ để giải mã tọa độ và cắt ảnh
+    // Hàm phụ trợ để giải mã tọa độ và cắt ảnh an toàn tuyệt đối
     Future<String> cropAndSave(int index) async {
       double xc = isTransposed ? output[0][index][0] : output[0][0][index];
       double yc = isTransposed ? output[0][index][1] : output[0][1][index];
       double w = isTransposed ? output[0][index][2] : output[0][2][index];
       double h = isTransposed ? output[0][index][3] : output[0][3][index];
 
+      // Nếu model trả về tọa độ chuẩn hóa [0.0, 1.0], nhân lên tỷ lệ inputSize
       if (w <= 1.0 && h <= 1.0) {
         xc *= inputSize;
         yc *= inputSize;
@@ -154,10 +154,11 @@ class AIHelper {
       int cropW = (w / inputSize * origW).toInt();
       int cropH = (h / inputSize * origH).toInt();
 
-      cropX = max(0, cropX);
-      cropY = max(0, cropY);
-      cropW = min(origW - cropX, max(1, cropW));
-      cropH = min(origH - cropY, max(1, cropH));
+      // Bảo vệ biên chống tràn và chống số âm (crash-proof clamping)
+      cropX = cropX.clamp(0, origW - 1);
+      cropY = cropY.clamp(0, origH - 1);
+      cropW = cropW.clamp(1, origW - cropX);
+      cropH = cropH.clamp(1, origH - cropY);
 
       final directory = await getTemporaryDirectory();
       final path = '${directory.path}/crop_${DateTime.now().millisecondsSinceEpoch}_$index.jpg';
@@ -170,9 +171,34 @@ class AIHelper {
       return path;
     }
 
-    String croppedFoodPath = await cropAndSave(maxFoodIndex);
+    // Hàm dự phòng cắt vùng trung tâm 85% ảnh nếu góc chụp mờ hoặc không vượt ngưỡng tin cậy
+    Future<String> cropCenterFallback() async {
+      final int cropW = (origW * 0.85).toInt().clamp(1, origW);
+      final int cropH = (origH * 0.85).toInt().clamp(1, origH);
+      final int cropX = ((origW - cropW) / 2).toInt().clamp(0, origW - 1);
+      final int cropY = ((origH - cropH) / 2).toInt().clamp(0, origH - 1);
+
+      final directory = await getTemporaryDirectory();
+      final path = '${directory.path}/crop_fallback_${DateTime.now().millisecondsSinceEpoch}.jpg';
+      
+      await Isolate.run(() {
+        img.Image cropped = img.copyCrop(originalImage, x: cropX, y: cropY, width: cropW, height: cropH);
+        File(path).writeAsBytesSync(img.encodeJpg(cropped));
+      });
+
+      return path;
+    }
+
+    String croppedFoodPath;
+    if (maxFoodIndex != -1 && maxFoodProb >= 0.08) {
+      croppedFoodPath = await cropAndSave(maxFoodIndex);
+    } else {
+      // Cơ chế Fallback an toàn, không để văng Exception
+      croppedFoodPath = await cropCenterFallback();
+    }
+
     String? croppedLabelPath;
-    if (maxLabelIndex != -1) {
+    if (maxLabelIndex != -1 && maxLabelProb > 0.20) {
       croppedLabelPath = await cropAndSave(maxLabelIndex);
     }
 
