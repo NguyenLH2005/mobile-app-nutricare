@@ -218,6 +218,85 @@ class FoodRepository {
     return nutritionArray;
   }
 
+  List<ServingUnitInfo> calculateAllServingUnits({
+    required String mainGroup,
+    required double p100,
+    required double c100,
+    required double f100,
+    required double actualWeight,
+  }) {
+    final List<ServingUnitInfo> results = [];
+    final groupLower = mainGroup.toLowerCase();
+
+    // 1. Nhóm đạm: 1 phần chuẩn cung cấp 7g Protein (Công thức 2.7)
+    if (p100 >= 3.0 || groupLower.contains('đạm') || groupLower.contains('protein') || groupLower.contains('thịt') || groupLower.contains('cá') || groupLower.contains('trứng') || groupLower.contains('hải sản')) {
+      if (p100 > 0) {
+        final double mServing = 700.0 / p100;
+        final double count = actualWeight / mServing;
+        results.add(ServingUnitInfo(
+          servingWeight: mServing,
+          servingCount: count,
+          groupName: 'Chất đạm',
+          groupShortName: 'đạm',
+          standardNutrient: '7g đạm',
+          standardDesc: '1 phần chuẩn = ${mServing.toStringAsFixed(0)}g (cung cấp 7g Đạm)',
+          summaryText: '≈ ${count.toStringAsFixed(1)} phần đạm chuẩn (1 phần = 7g đạm = ${mServing.toStringAsFixed(0)}g)',
+        ));
+      }
+    }
+
+    // 2. Nhóm tinh bột / bột đường: 1 phần chuẩn cung cấp 20g Carbohydrate (Công thức 2.8)
+    if (c100 >= 5.0 || groupLower.contains('đường') || groupLower.contains('bột') || groupLower.contains('carb') || groupLower.contains('khoai') || groupLower.contains('ngô') || groupLower.contains('trái cây') || groupLower.contains('chuối')) {
+      if (c100 > 0) {
+        final double mServing = 2000.0 / c100;
+        final double count = actualWeight / mServing;
+        results.add(ServingUnitInfo(
+          servingWeight: mServing,
+          servingCount: count,
+          groupName: 'Chất bột đường',
+          groupShortName: 'tinh bột',
+          standardNutrient: '20g tinh bột',
+          standardDesc: '1 phần chuẩn = ${mServing.toStringAsFixed(0)}g (cung cấp 20g Tinh bột)',
+          summaryText: '≈ ${count.toStringAsFixed(1)} phần tinh bột chuẩn (1 phần = 20g tinh bột = ${mServing.toStringAsFixed(0)}g)',
+        ));
+      }
+    }
+
+    // 3. Nhóm chất béo: 1 phần chuẩn cung cấp 5g Lipid (Công thức 2.9)
+    if (f100 >= 3.0 || groupLower.contains('béo') || groupLower.contains('fat') || groupLower.contains('lipid') || groupLower.contains('hạt') || groupLower.contains('dầu') || groupLower.contains('trứng')) {
+      if (f100 > 0) {
+        final double mServing = 500.0 / f100;
+        final double count = actualWeight / mServing;
+        results.add(ServingUnitInfo(
+          servingWeight: mServing,
+          servingCount: count,
+          groupName: 'Chất béo',
+          groupShortName: 'béo',
+          standardNutrient: '5g chất béo',
+          standardDesc: '1 phần chuẩn = ${mServing.toStringAsFixed(0)}g (cung cấp 5g Chất béo)',
+          summaryText: '≈ ${count.toStringAsFixed(1)} phần béo chuẩn (1 phần = 5g chất béo = ${mServing.toStringAsFixed(0)}g)',
+        ));
+      }
+    }
+
+    // 4. Mặc định nếu không có nhóm đa lượng nào ở trên: quy chuẩn rau củ 80g
+    if (results.isEmpty) {
+      final double mServing = 80.0;
+      final double count = actualWeight / mServing;
+      results.add(ServingUnitInfo(
+        servingWeight: mServing,
+        servingCount: count,
+        groupName: 'Rau củ quả',
+        groupShortName: 'rau củ',
+        standardNutrient: '80g rau củ',
+        standardDesc: '1 phần chuẩn = 80g',
+        summaryText: '≈ ${count.toStringAsFixed(1)} phần rau củ chuẩn (1 phần = 80g)',
+      ));
+    }
+
+    return results;
+  }
+
   ServingUnitInfo calculateServingUnit({
     required String mainGroup,
     required double p100,
@@ -225,78 +304,23 @@ class FoodRepository {
     required double f100,
     required double actualWeight,
   }) {
-    final groupLower = mainGroup.toLowerCase();
-    
-    // 1. Nhóm đạm: 1 phần chuẩn cung cấp 7g Protein (Công thức 2.7)
-    if (groupLower.contains('đạm') || groupLower.contains('protein') || p100 >= 10.0) {
-      if (p100 > 0) {
-        final double mServing = 700.0 / p100;
-        final double count = actualWeight / mServing;
-        final String mServingStr = mServing.toStringAsFixed(0);
-        final String countStr = count.toStringAsFixed(1);
-        return ServingUnitInfo(
-          servingWeight: mServing,
-          servingCount: count,
-          groupName: 'Chất đạm',
-          standardDesc: '1 phần chuẩn = ${mServingStr}g (cung cấp 7g Đạm)',
-          summaryText: '≈ $countStr phần đạm chuẩn (1 phần = ${mServingStr}g)',
-        );
-      }
-    }
-    
-    // 2. Nhóm tinh bột / bột đường: 1 phần chuẩn cung cấp 20g Carbohydrate (Công thức 2.8)
-    if (groupLower.contains('đường') || groupLower.contains('bột') || groupLower.contains('carb') || c100 >= 15.0) {
-      if (c100 > 0) {
-        final double mServing = 2000.0 / c100;
-        final double count = actualWeight / mServing;
-        final String mServingStr = mServing.toStringAsFixed(0);
-        final String countStr = count.toStringAsFixed(1);
-        return ServingUnitInfo(
-          servingWeight: mServing,
-          servingCount: count,
-          groupName: 'Chất bột đường',
-          standardDesc: '1 phần chuẩn = ${mServingStr}g (cung cấp 20g Tinh bột)',
-          summaryText: '≈ $countStr phần tinh bột chuẩn (1 phần = ${mServingStr}g)',
-        );
-      }
-    }
-    
-    // 3. Nhóm chất béo: 1 phần chuẩn cung cấp 5g Lipid (Công thức 2.9)
-    if (groupLower.contains('béo') || groupLower.contains('fat') || groupLower.contains('lipid') || f100 >= 10.0) {
-      if (f100 > 0) {
-        final double mServing = 500.0 / f100;
-        final double count = actualWeight / mServing;
-        final String mServingStr = mServing.toStringAsFixed(0);
-        final String countStr = count.toStringAsFixed(1);
-        return ServingUnitInfo(
-          servingWeight: mServing,
-          servingCount: count,
-          groupName: 'Chất béo',
-          standardDesc: '1 phần chuẩn = ${mServingStr}g (cung cấp 5g Chất béo)',
-          summaryText: '≈ $countStr phần béo chuẩn (1 phần = ${mServingStr}g)',
-        );
-      }
-    }
-
-    // 4. Mặc định nhóm rau củ quả: 1 phần chuẩn = 80g
-    final double mServing = 80.0;
-    final double count = actualWeight / mServing;
-    final String countStr = count.toStringAsFixed(1);
-    return ServingUnitInfo(
-      servingWeight: mServing,
-      servingCount: count,
-      groupName: 'Rau củ quả',
-      standardDesc: '1 phần chuẩn = 80g',
-      summaryText: '≈ $countStr phần rau củ chuẩn (1 phần = 80g)',
+    final list = calculateAllServingUnits(
+      mainGroup: mainGroup,
+      p100: p100,
+      c100: c100,
+      f100: f100,
+      actualWeight: actualWeight,
     );
+    return list.first;
   }
 }
-
 
 class ServingUnitInfo {
   final double servingWeight;
   final double servingCount;
   final String groupName;
+  final String groupShortName;
+  final String standardNutrient;
   final String standardDesc;
   final String summaryText;
 
@@ -304,7 +328,11 @@ class ServingUnitInfo {
     required this.servingWeight,
     required this.servingCount,
     required this.groupName,
+    required this.groupShortName,
+    required this.standardNutrient,
     required this.standardDesc,
     required this.summaryText,
   });
+
+  String get singleLineText => summaryText;
 }

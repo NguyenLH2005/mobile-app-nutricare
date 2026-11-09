@@ -321,14 +321,21 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           ),
           const Divider(height: 20),
 
-          // Hàng 1: Giới tính, Tuổi, Chiều cao, Cân nặng
+          // Hàng 1: Giới tính, Tuổi, Ngày sinh (rộng rãi, không bị rớt dòng ngày sinh)
           Row(
             children: [
               _buildMetricItem('Giới tính', profile.gender),
               _buildMetricItem('Tuổi', age != null ? '$age tuổi' : profile.dobFormatted),
               _buildMetricItem('Ngày sinh', profile.dobFormatted),
+            ],
+          ),
+          const SizedBox(height: 12),
+          // Hàng 2: Chiều cao, Cân nặng
+          Row(
+            children: [
               _buildMetricItem('Chiều cao', '${height.toStringAsFixed(0)} cm'),
               _buildMetricItem('Cân nặng', '${weight.toStringAsFixed(1)} kg'),
+              const Expanded(child: SizedBox()),
             ],
           ),
           const Divider(height: 24),
@@ -728,6 +735,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     final hasDiabetes = flags.isNotEmpty && flags[0] == '1';
     final hasHypertension = flags.length > 1 && flags[1] == '1';
     final hasLipid = flags.length > 2 && flags[2] == '1';
+    final hasGout = flags.length > 3 && flags[3] == '1';
     final hasKidney = profile.ceilingProteinKidney > 0;
     final hasCardio = flags.length > 5 && flags[5] == '1';
 
@@ -879,9 +887,31 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               label: 'Chất đạm (Protein)',
               value: '<= ${profile.ceilingProteinKidney.toStringAsFixed(1)} g/ngày',
               isAffected: true,
-              reason: 'Do bạn mắc bệnh Thận mạn (KDIGO: 0.6g/kg cân nặng)',
+              reason: 'Do bạn mắc bệnh Thận mạn (Kiểm soát 0.8g/kg/ngày theo KDIGO 2024)',
             ),
           ],
+
+          // Trần Đạm/Purine cho người bệnh Gout
+          if (hasGout) ...[
+            const Divider(height: 12),
+            _buildCeilingRow(
+              label: 'Đạm giàu Purine (Bệnh Gout)',
+              value: '<= 25 g/bữa ăn',
+              isAffected: true,
+              reason: 'Do bạn mắc bệnh Gout (hạn chế thịt đỏ, hải sản vỏ cứng để tránh kích hoạt cơn Gout cấp)',
+            ),
+          ],
+
+          // Nhu cầu Chất xơ chuẩn hóa theo Viện Dinh Dưỡng & WHO
+          const Divider(height: 12),
+          _buildCeilingRow(
+            label: 'Chất xơ (Dietary Fiber)',
+            value: '>= ${profile.budgetFiber.toStringAsFixed(0)} g/ngày',
+            isAffected: profile.isObesityMode || hasDiabetes || hasLipid,
+            reason: (profile.isObesityMode || hasDiabetes || hasLipid)
+                ? 'Khuyến nghị tăng cường chất xơ (giúp ổn định đường huyết, kiểm soát cân nặng & giảm mỡ máu)'
+                : 'Mức khuyến nghị tối thiểu bảo vệ hệ tiêu hóa của Viện Dinh Dưỡng (NIN)',
+          ),
         ],
       ),
     );

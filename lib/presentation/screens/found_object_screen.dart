@@ -1,3 +1,4 @@
+import '../../data/datasources/local/database_helper.dart';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -76,6 +77,9 @@ class _FoundObjectScreenState extends ConsumerState<FoundObjectScreen> {
   String? _suggestionText;
   bool _isLoadingSuggestion = false;
   String? _suggestionError;
+  bool _isAddedToMenu = false;
+  final TextEditingController _eggPortionController = TextEditingController();
+  double _eggEatenCount = 1.0;
 
   bool get _isEggFood {
     final name = _currentData.foodName.toLowerCase();
@@ -103,13 +107,97 @@ class _FoundObjectScreenState extends ConsumerState<FoundObjectScreen> {
     super.initState();
     _currentData = widget.resultData;
     _suggestionText = _currentData.aiSuggestion;
+    _isAddedToMenu = !widget.isFromScan && _currentData.id != null;
+    if (_isEggFood) {
+      _eggEatenCount = _eggQuantity * _currentData.consumptionRatio;
+      if (_eggEatenCount <= 0) _eggEatenCount = 1.0;
+      _eggPortionController.text = _eggEatenCount == _eggEatenCount.roundToDouble()
+          ? _eggEatenCount.toInt().toString()
+          : _eggEatenCount.toString();
+    }
     if (widget.isFromScan) {
       WidgetsBinding.instance.addPostFrameCallback((_) async {
         if (_isEggFood) {
           await _showEggSelectionModal();
         }
-        // Chỉ nạp khi người dùng chủ động nhấn nút để tiết kiệm token
       });
+    }
+  }
+
+  @override
+  void dispose() {
+    _eggPortionController.dispose();
+    super.dispose();
+  }
+
+  void _onEggPortionChanged(String val) {
+    final parsed = double.tryParse(val.trim().replaceAll(',', '.'));
+    if (parsed != null && parsed > 0) {
+      _eggEatenCount = parsed;
+      final totalEggs = _eggQuantity.toDouble();
+      final ratio = (parsed / totalEggs).clamp(0.01, 5.0);
+      _setConsumptionRatio(ratio, fromEggInput: true);
+    }
+  }
+
+  void _incrementEggPortion() {
+    _eggEatenCount = _eggEatenCount + 0.5;
+    _eggPortionController.text = _eggEatenCount == _eggEatenCount.roundToDouble()
+        ? _eggEatenCount.toInt().toString()
+        : _eggEatenCount.toString();
+    final totalEggs = _eggQuantity.toDouble();
+    final ratio = (_eggEatenCount / totalEggs).clamp(0.01, 5.0);
+    _setConsumptionRatio(ratio, fromEggInput: true);
+  }
+
+  void _decrementEggPortion() {
+    if (_eggEatenCount > 0.5) {
+      _eggEatenCount = _eggEatenCount - 0.5;
+      _eggPortionController.text = _eggEatenCount == _eggEatenCount.roundToDouble()
+          ? _eggEatenCount.toInt().toString()
+          : _eggEatenCount.toString();
+      final totalEggs = _eggQuantity.toDouble();
+      final ratio = (_eggEatenCount / totalEggs).clamp(0.01, 5.0);
+      _setConsumptionRatio(ratio, fromEggInput: true);
+    }
+  }
+
+  Future<void> _handleAddToMenu() async {
+    try {
+      if (_currentData.id == null) {
+        final newId = await DatabaseHelper.instance.insertScan(_currentData);
+        if (mounted) {
+          setState(() {
+            _currentData = _currentData.copyWith(id: newId);
+            _isAddedToMenu = true;
+          });
+        }
+      } else {
+        await DatabaseHelper.instance.updateScan(_currentData);
+        if (mounted) {
+          setState(() {
+            _isAddedToMenu = true;
+          });
+        }
+      }
+      ref.invalidate(historyProvider);
+      ref.read(syncProvider.notifier).syncNow();
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('✓ Đã thêm "${_currentData.foodName}" vào tiến trình dinh dưỡng hôm nay!'),
+            backgroundColor: Colors.green.shade700,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Lỗi: $e'), backgroundColor: Colors.red),
+        );
+      }
     }
   }
 
@@ -235,6 +323,8 @@ class _FoundObjectScreenState extends ConsumerState<FoundObjectScreen> {
     if (mounted) {
       setState(() {
         _currentData = updatedData;
+        _eggEatenCount = quantity.toDouble();
+        _eggPortionController.text = quantity.toString();
       });
     }
   }
@@ -505,7 +595,7 @@ class _FoundObjectScreenState extends ConsumerState<FoundObjectScreen> {
     );
   }
 
-  Future<void> _setConsumptionRatio(double newRatio) async {
+  Future<void> _setConsumptionRatio(double newRatio, {bool fromEggInput = false}) async {
     final list = _currentData.decodedNutrition;
     double p100 = 0, c100 = 0, f100 = 0;
     for (var item in list) {
@@ -529,13 +619,19 @@ class _FoundObjectScreenState extends ConsumerState<FoundObjectScreen> {
       updatedAt: DateTime.now(),
     );
 
-    if (_currentData.id != null) {
+    if (_currentData.id != null && _isAddedToMenu) {
       await ref.read(historyControllerProvider.notifier).updateScan(updatedData);
       ref.read(syncProvider.notifier).syncNow();
     }
 
     setState(() {
       _currentData = updatedData;
+      if (!fromEggInput && _isEggFood) {
+        _eggEatenCount = _eggQuantity * newRatio;
+        _eggPortionController.text = _eggEatenCount == _eggEatenCount.roundToDouble()
+            ? _eggEatenCount.toInt().toString()
+            : _eggEatenCount.toString();
+      }
     });
   }
 
@@ -555,16 +651,22 @@ class _FoundObjectScreenState extends ConsumerState<FoundObjectScreen> {
               children: [
                 Row(
                   children: [
-                    ChoiceChip(
-                      label: const Text('Theo % khay'),
-                      selected: mode == 0,
-                      onSelected: (_) => setDialogState(() => mode = 0),
+                    Expanded(
+                      child: ChoiceChip(
+                        label: const Center(child: Text('Theo % khay', style: TextStyle(fontSize: 13))),
+                        selected: mode == 0,
+                        showCheckmark: false,
+                        onSelected: (_) => setDialogState(() => mode = 0),
+                      ),
                     ),
                     const SizedBox(width: 8),
-                    ChoiceChip(
-                      label: const Text('Theo số gam (g)'),
-                      selected: mode == 1,
-                      onSelected: (_) => setDialogState(() => mode = 1),
+                    Expanded(
+                      child: ChoiceChip(
+                        label: const Center(child: Text('Theo số gam (g)', style: TextStyle(fontSize: 13))),
+                        selected: mode == 1,
+                        showCheckmark: false,
+                        onSelected: (_) => setDialogState(() => mode = 1),
+                      ),
                     ),
                   ],
                 ),
@@ -821,7 +923,7 @@ class _FoundObjectScreenState extends ConsumerState<FoundObjectScreen> {
       if (item['id'] == 'fiber') fiber = item;
     }
 
-    final servingInfo = ref.read(foodRepositoryProvider).calculateServingUnit(
+    final servingUnits = ref.read(foodRepositoryProvider).calculateAllServingUnits(
       mainGroup: _currentData.mainGroup,
       p100: p100,
       c100: c100,
@@ -896,72 +998,46 @@ class _FoundObjectScreenState extends ConsumerState<FoundObjectScreen> {
                             style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Color(0xFF1B233A)),
                           ),
                         ),
-                        InkWell(
-                          onTap: _editWeight,
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.end,
-                            children: [
-                              Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Text(
-                                    _currentData.formatWeight(
-                                      fallback: _isEggFood ? '50 g' : '100 g',
-                                    ),
-                                    style: const TextStyle(
-                                      fontSize: 20,
-                                      fontWeight: FontWeight.bold,
-                                      color: Colors.green,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 6),
-                                  const Icon(Icons.edit, color: Colors.green, size: 18),
-                                ],
-                              ),
-                              if (_isEggFood) ...[
-                                const SizedBox(height: 2),
+                        if (!_isEggFood)
+                          InkWell(
+                            onTap: _editWeight,
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
                                 Text(
-                                  '($_eggQuantity quả)',
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w600,
-                                    color: Colors.green.shade800,
+                                  _currentData.formatWeight(
+                                    fallback: '100 g',
+                                  ),
+                                  style: const TextStyle(
+                                    fontSize: 20,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.green,
                                   ),
                                 ),
+                                const SizedBox(width: 6),
+                                const Icon(Icons.edit, color: Colors.green, size: 18),
                               ],
-                            ],
+                            ),
                           ),
-                        ),
                       ],
                     ),
                     if (_isEggFood) ...[
-                      const SizedBox(height: 10),
-                      InkWell(
-                        onTap: () => _showEggSelectionModal(),
-                        borderRadius: BorderRadius.circular(8),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                          decoration: BoxDecoration(
-                            color: Colors.amber.shade50,
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: Colors.amber.shade300),
+                      const SizedBox(height: 12),
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton.icon(
+                          onPressed: () => _showEggSelectionModal(),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.amber.shade700,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                            elevation: 0,
                           ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(Icons.egg_outlined, size: 16, color: Colors.amber.shade900),
-                              const SizedBox(width: 6),
-                              Text(
-                                'Đổi loại trứng & số lượng quả',
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w600,
-                                  color: Colors.amber.shade900,
-                                ),
-                              ),
-                              const SizedBox(width: 4),
-                              Icon(Icons.tune_rounded, size: 14, color: Colors.amber.shade900),
-                            ],
+                          icon: const Icon(Icons.egg_rounded, size: 18),
+                          label: Text(
+                            'Loại: ${_matchedEggOption.displayName} • $_eggQuantity quả',
+                            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
                           ),
                         ),
                       ),
@@ -971,15 +1047,16 @@ class _FoundObjectScreenState extends ConsumerState<FoundObjectScreen> {
               ),
               const SizedBox(height: 12),
 
-              // 2.1. ĐƠN VỊ KHẨU PHẦN CHUẨN (Standard Food Serving Unit - Công thức 2.7 - 2.9)
+              // 2.1. ĐƠN VỊ KHẨU PHẦN CHUẨN (Hiển thị tất cả quy đổi từ CSV, chỉ 1 dòng gọn gàng)
               Container(
-                padding: const EdgeInsets.all(14),
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                 decoration: BoxDecoration(
                   color: const Color(0xFFF0FDF4),
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(color: Colors.green.shade200),
                 ),
                 child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
                     Container(
                       padding: const EdgeInsets.all(8),
@@ -993,31 +1070,17 @@ class _FoundObjectScreenState extends ConsumerState<FoundObjectScreen> {
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'QUY ĐỔI KHẨU PHẦN CHUẨN (${servingInfo.groupName.toUpperCase()})',
+                        children: servingUnits.map((su) => Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 2.5),
+                          child: Text(
+                            su.singleLineText,
                             style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.green.shade800,
-                              letterSpacing: 0.5,
-                            ),
-                          ),
-                          const SizedBox(height: 3),
-                          Text(
-                            servingInfo.summaryText,
-                            style: TextStyle(
-                              fontSize: 14,
+                              fontSize: 13.5,
                               fontWeight: FontWeight.bold,
                               color: Colors.green.shade900,
                             ),
                           ),
-                          const SizedBox(height: 2),
-                          Text(
-                            servingInfo.standardDesc,
-                            style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
-                          ),
-                        ],
+                        )).toList(),
                       ),
                     ),
                   ],
@@ -1025,7 +1088,7 @@ class _FoundObjectScreenState extends ConsumerState<FoundObjectScreen> {
               ),
               const SizedBox(height: 12),
 
-              // 2.2. THANH CHỌN HỆ SỐ TIÊU THỤ THỰC TẾ (gamma in (0, 1] - Công thức 2.10 - 2.12)
+              // 2.2. THANH CHỌN HỆ SỐ TIÊU THỤ THỰC TẾ (gamma in (0, 1])
               Container(
                 padding: const EdgeInsets.all(14),
                 decoration: BoxDecoration(
@@ -1054,49 +1117,112 @@ class _FoundObjectScreenState extends ConsumerState<FoundObjectScreen> {
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),
-                        const SizedBox(width: 8),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                          decoration: BoxDecoration(
-                            color: cRatio < 0.99 ? Colors.blue.shade50 : Colors.grey.shade100,
-                            borderRadius: BorderRadius.circular(6),
-                            border: Border.all(color: cRatio < 0.99 ? Colors.blue.shade200 : Colors.grey.shade300),
-                          ),
-                          child: Text(
-                            cRatio < 0.99
-                                ? 'Ăn ${actualW.toStringAsFixed(0)}g (${(cRatio * 100).round()}%)'
-                                : 'Nguyên khay (${actualW.toStringAsFixed(0)}g)',
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.bold,
-                              color: cRatio < 0.99 ? Colors.blue.shade800 : Colors.grey.shade700,
-                            ),
-                          ),
-                        ),
-                        if (cRatio < 0.99) ...[
-                          const SizedBox(width: 4),
+                        if (cRatio < 0.99 || (_isEggFood && _eggEatenCount != _eggQuantity)) ...[
                           InkWell(
                             onTap: () => _setConsumptionRatio(1.0),
                             borderRadius: BorderRadius.circular(12),
-                            child: const Padding(
-                              padding: EdgeInsets.all(4),
-                              child: Icon(Icons.close, size: 16, color: Colors.grey),
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(Icons.refresh, size: 14, color: Colors.grey),
+                                  const SizedBox(width: 2),
+                                  Text('Đặt lại', style: TextStyle(fontSize: 12, color: Colors.grey.shade700)),
+                                ],
+                              ),
                             ),
                           ),
                         ],
                       ],
                     ),
                     const SizedBox(height: 10),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 6,
-                      children: [
-                        _buildRatioChip(0.25, '1/4 (25%)'),
-                        _buildRatioChip(0.50, '1/2 (50%)'),
-                        _buildRatioChip(0.75, '3/4 (75%)'),
-                        _buildRatioChip(1.00, 'Hết khay (100%)'),
-                        _buildCustomRatioChip(),
-                      ],
+
+                    if (_isEggFood) ...[
+                      // Ô nhập số cho người dùng tự nhập số quả thực tế (hỗ trợ số thập phân, nút cộng trừ ở bên phải)
+                      Row(
+                        children: [
+                          Expanded(
+                            child: TextField(
+                              controller: _eggPortionController,
+                              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                              decoration: InputDecoration(
+                                isDense: true,
+                                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                                labelText: 'Số quả ăn thực tế',
+                                suffixText: 'quả',
+                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                              ),
+                              onChanged: _onEggPortionChanged,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Container(
+                            decoration: BoxDecoration(
+                              border: Border.all(color: Colors.grey.shade300),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                IconButton(
+                                  icon: const Icon(Icons.remove, size: 18),
+                                  onPressed: _decrementEggPortion,
+                                  padding: const EdgeInsets.all(8),
+                                  constraints: const BoxConstraints(),
+                                ),
+                                Container(width: 1, height: 24, color: Colors.grey.shade300),
+                                IconButton(
+                                  icon: const Icon(Icons.add, size: 18),
+                                  onPressed: _incrementEggPortion,
+                                  padding: const EdgeInsets.all(8),
+                                  constraints: const BoxConstraints(),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        'Ăn ${_eggEatenCount.toStringAsFixed(1).replaceAll('.0', '')} quả trứng (tương đương ${actualW.toStringAsFixed(0)}g)',
+                        style: TextStyle(fontSize: 12, color: Colors.grey.shade700, fontWeight: FontWeight.w500),
+                      ),
+                    ] else ...[
+                      // Các nút chọn phần trăm gọn gàng (không phân số)
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 6,
+                        children: [
+                          _buildRatioChip(0.25, '25%'),
+                          _buildRatioChip(0.50, '50%'),
+                          _buildRatioChip(0.75, '75%'),
+                          _buildRatioChip(1.00, '100%'),
+                          _buildCustomRatioChip(),
+                        ],
+                      ),
+                    ],
+
+                    const SizedBox(height: 14),
+
+                    // Nút Thêm vào thực đơn hôm nay
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        onPressed: _handleAddToMenu,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: _isAddedToMenu ? Colors.green.shade700 : const Color(0xFF1B233A),
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          elevation: 0,
+                        ),
+                        icon: Icon(_isAddedToMenu ? Icons.check_circle_outline : Icons.add_circle_outline, size: 18),
+                        label: Text(
+                          _isAddedToMenu ? 'Đã có trong thực đơn hôm nay' : 'Thêm vào thực đơn hôm nay',
+                          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+                        ),
+                      ),
                     ),
                   ],
                 ),

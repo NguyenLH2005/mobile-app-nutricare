@@ -2,9 +2,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../domain/usecases/analyze_food_usecase.dart';
 import '../../data/models/scan_history_model.dart';
-import '../../data/repositories/food_repository.dart';
 import '../../data/datasources/local/database_helper.dart';
-import 'sync_controller.dart';
+import '../../data/repositories/food_repository.dart';
 
 // Cung cấp Repository và UseCase
 final foodRepositoryProvider = Provider((ref) => FoodRepository());
@@ -43,15 +42,7 @@ class ScanController extends Notifier<ScanState> {
     final result = await useCase.execute(imagePath);
 
     if (result != null) {
-      try {
-        await DatabaseHelper.instance.insertScan(result);
-
-        // Cập nhật lại danh sách lịch sử trên toàn app
-        ref.invalidate(historyProvider);
-        ref.read(syncProvider.notifier).syncNow();
-      } catch (_) {}
-
-      // Đẩy kết quả sang màn hình ResultScreen
+      // Đẩy kết quả sang màn hình FoundObjectScreen (chưa ghi vào nhật ký ngày cho tới khi bấm Thêm vào thực đơn)
       state = ScanState(status: ScanStatus.success, result: result);
     } else {
       state = ScanState(status: ScanStatus.error);
