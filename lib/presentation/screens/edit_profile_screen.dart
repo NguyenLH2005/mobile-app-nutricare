@@ -204,7 +204,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
               TextFormField(
                 controller: _dobController,
                 decoration: const InputDecoration(
-                  labelText: 'Ngày sinh (DD/MM/YYYY)',
+                  labelText: 'Ngày sinh',
                   border: OutlineInputBorder(),
                   prefixIcon: Icon(Icons.cake_outlined),
                   suffixIcon: Icon(Icons.calendar_today),
@@ -223,7 +223,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                     child: TextFormField(
                       controller: _weightController,
                       decoration: const InputDecoration(
-                        labelText: 'Cân nặng (kg)',
+                        labelText: 'Cân nặng',
                         border: OutlineInputBorder(),
                         prefixIcon: Icon(Icons.monitor_weight_outlined),
                       ),
@@ -242,7 +242,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                     child: TextFormField(
                       controller: _heightController,
                       decoration: const InputDecoration(
-                        labelText: 'Chiều cao (cm)',
+                        labelText: 'Chiều cao',
                         border: OutlineInputBorder(),
                         prefixIcon: Icon(Icons.height_outlined),
                       ),
@@ -297,23 +297,23 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                 items: const [
                   DropdownMenuItem(
                     value: 1.2,
-                    child: Text('Ít vận động (Làm việc văn phòng, tĩnh tại)'),
+                    child: Text('Ít vận động - Làm việc văn phòng'),
                   ),
                   DropdownMenuItem(
                     value: 1.375,
-                    child: Text('Vận động nhẹ (Tập nhẹ 1-3 ngày/tuần)'),
+                    child: Text('Vận động nhẹ - Tập nhẹ 1-3 ngày/tuần'),
                   ),
                   DropdownMenuItem(
                     value: 1.55,
-                    child: Text('Vận động vừa (Tập vừa 3-5 ngày/tuần)'),
+                    child: Text('Vận động vừa - Tập vừa 3-5 ngày/tuần'),
                   ),
                   DropdownMenuItem(
                     value: 1.725,
-                    child: Text('Vận động nhiều (Tập nặng 6-7 ngày/tuần)'),
+                    child: Text('Vận động nhiều - Tập nặng 6-7 ngày/tuần'),
                   ),
                   DropdownMenuItem(
                     value: 1.9,
-                    child: Text('Vận động rất nhiều (VĐV, tập 2 lần/ngày)'),
+                    child: Text('Vận động rất nhiều - VĐV, tập 2 lần/ngày'),
                   ),
                 ],
                 onChanged: (val) => setState(() => _activityFactor = val!),

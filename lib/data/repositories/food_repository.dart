@@ -239,8 +239,8 @@ class FoodRepository {
           groupName: 'Chất đạm',
           groupShortName: 'đạm',
           standardNutrient: '7g đạm',
-          standardDesc: '1 phần chuẩn = ${mServing.toStringAsFixed(0)}g (cung cấp 7g Đạm)',
-          summaryText: '≈ ${count.toStringAsFixed(1)} phần đạm chuẩn (1 phần = 7g đạm = ${mServing.toStringAsFixed(0)}g)',
+          standardDesc: '1 phần chuẩn = ${mServing.toStringAsFixed(0)}g • 7g Đạm',
+          summaryText: '≈ ${count.toStringAsFixed(1)} phần đạm chuẩn • 1 phần = 7g đạm = ${mServing.toStringAsFixed(0)}g',
         ));
       }
     }
@@ -256,8 +256,8 @@ class FoodRepository {
           groupName: 'Chất bột đường',
           groupShortName: 'tinh bột',
           standardNutrient: '20g tinh bột',
-          standardDesc: '1 phần chuẩn = ${mServing.toStringAsFixed(0)}g (cung cấp 20g Tinh bột)',
-          summaryText: '≈ ${count.toStringAsFixed(1)} phần tinh bột chuẩn (1 phần = 20g tinh bột = ${mServing.toStringAsFixed(0)}g)',
+          standardDesc: '1 phần chuẩn = ${mServing.toStringAsFixed(0)}g • 20g Tinh bột',
+          summaryText: '≈ ${count.toStringAsFixed(1)} phần tinh bột chuẩn • 1 phần = 20g tinh bột = ${mServing.toStringAsFixed(0)}g',
         ));
       }
     }
@@ -273,8 +273,8 @@ class FoodRepository {
           groupName: 'Chất béo',
           groupShortName: 'béo',
           standardNutrient: '5g chất béo',
-          standardDesc: '1 phần chuẩn = ${mServing.toStringAsFixed(0)}g (cung cấp 5g Chất béo)',
-          summaryText: '≈ ${count.toStringAsFixed(1)} phần béo chuẩn (1 phần = 5g chất béo = ${mServing.toStringAsFixed(0)}g)',
+          standardDesc: '1 phần chuẩn = ${mServing.toStringAsFixed(0)}g • 5g Chất béo',
+          summaryText: '≈ ${count.toStringAsFixed(1)} phần béo chuẩn • 1 phần = 5g chất béo = ${mServing.toStringAsFixed(0)}g',
         ));
       }
     }
@@ -290,7 +290,7 @@ class FoodRepository {
         groupShortName: 'rau củ',
         standardNutrient: '80g rau củ',
         standardDesc: '1 phần chuẩn = 80g',
-        summaryText: '≈ ${count.toStringAsFixed(1)} phần rau củ chuẩn (1 phần = 80g)',
+        summaryText: '≈ ${count.toStringAsFixed(1)} phần rau củ chuẩn • 1 phần = 80g',
       ));
     }
 

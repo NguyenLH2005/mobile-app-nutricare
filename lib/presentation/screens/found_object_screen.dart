@@ -1,4 +1,4 @@
-import '../../data/datasources/local/database_helper.dart';
+﻿import '../../data/datasources/local/database_helper.dart';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -34,26 +34,26 @@ class EggOption {
 const List<EggOption> standardEggOptions = [
   EggOption(
     id: 'chicken_egg',
-    displayName: 'Trứng gà (công nghiệp)',
-    csvSearchName: 'Trứng gà công nghiệp',
+    displayName: 'Trá»©ng gÃ  cÃ´ng nghiá»‡p',
+    csvSearchName: 'Trá»©ng gÃ  cÃ´ng nghiá»‡p',
     weightPerUnit: 50.0,
   ),
   EggOption(
     id: 'local_chicken_egg',
-    displayName: 'Trứng gà ta',
-    csvSearchName: 'Trứng gà ta',
+    displayName: 'Trá»©ng gÃ  ta',
+    csvSearchName: 'Trá»©ng gÃ  ta',
     weightPerUnit: 38.0,
   ),
   EggOption(
     id: 'duck_egg',
-    displayName: 'Trứng vịt',
-    csvSearchName: 'Trứng vịt',
+    displayName: 'Trá»©ng vá»‹t',
+    csvSearchName: 'Trá»©ng vá»‹t',
     weightPerUnit: 60.0,
   ),
   EggOption(
     id: 'balut_egg',
-    displayName: 'Trứng vịt lộn',
-    csvSearchName: 'Trứng vịt lộn',
+    displayName: 'Trá»©ng vá»‹t lá»™n',
+    csvSearchName: 'Trá»©ng vá»‹t lá»™n',
     weightPerUnit: 70.0,
   ),
 ];
@@ -83,7 +83,7 @@ class _FoundObjectScreenState extends ConsumerState<FoundObjectScreen> {
 
   bool get _isEggFood {
     final name = _currentData.foodName.toLowerCase();
-    return name.contains('trứng') || name.contains('egg');
+    return name.contains('trá»©ng') || name.contains('egg');
   }
 
   EggOption get _matchedEggOption {
@@ -186,7 +186,7 @@ class _FoundObjectScreenState extends ConsumerState<FoundObjectScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('✓ Đã thêm "${_currentData.foodName}" vào tiến trình dinh dưỡng hôm nay!'),
+            content: Text('âœ“ ÄÃ£ thÃªm "${_currentData.foodName}" vÃ o tiáº¿n trÃ¬nh dinh dÆ°á»¡ng hÃ´m nay!'),
             backgroundColor: Colors.green.shade700,
             behavior: SnackBarBehavior.floating,
           ),
@@ -195,7 +195,7 @@ class _FoundObjectScreenState extends ConsumerState<FoundObjectScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Lỗi: $e'), backgroundColor: Colors.red),
+          SnackBar(content: Text('Lá»—i: $e'), backgroundColor: Colors.red),
         );
       }
     }
@@ -208,9 +208,9 @@ class _FoundObjectScreenState extends ConsumerState<FoundObjectScreen> {
     if (profileState.tdee == null || profileState.profile == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: const Text('Bạn cần nhập thông số cá nhân để có thể nhận được gợi ý dinh dưỡng.'),
+          content: const Text('Báº¡n cáº§n nháº­p thÃ´ng sá»‘ cÃ¡ nhÃ¢n Ä‘á»ƒ cÃ³ thá»ƒ nháº­n Ä‘Æ°á»£c gá»£i Ã½ dinh dÆ°á»¡ng.'),
           action: SnackBarAction(
-            label: 'Nhập ngay',
+            label: 'Nháº­p ngay',
             textColor: Colors.amber,
             onPressed: () {
               Navigator.push(
@@ -236,11 +236,11 @@ class _FoundObjectScreenState extends ConsumerState<FoundObjectScreen> {
       for (var item in decoded) {
         final id = item['id'];
         final val = item['per_100g'] ?? item['per_label'] ?? 0;
-        if (id == 'energy') fallbackData['Năng lượng'] = val;
-        if (id == 'protein') fallbackData['Chất đạm'] = val;
-        if (id == 'fat') fallbackData['Chất béo (Fat)'] = val;
-        if (id == 'carb') fallbackData['Chất bột đường'] = val;
-        if (id == 'fiber') fallbackData['Chất xơ'] = val;
+        if (id == 'energy') fallbackData['NÄƒng lÆ°á»£ng'] = val;
+        if (id == 'protein') fallbackData['Cháº¥t Ä‘áº¡m'] = val;
+        if (id == 'fat') fallbackData['Cháº¥t bÃ©o (Fat)'] = val;
+        if (id == 'carb') fallbackData['Cháº¥t bá»™t Ä‘Æ°á»ng'] = val;
+        if (id == 'fiber') fallbackData['Cháº¥t xÆ¡'] = val;
       }
       if (fallbackData.isNotEmpty) {
         rawFoodData = fallbackData;
@@ -251,7 +251,7 @@ class _FoundObjectScreenState extends ConsumerState<FoundObjectScreen> {
       if (mounted) {
         setState(() {
           _isLoadingSuggestion = false;
-          _suggestionError = 'Không tìm thấy dữ liệu gốc của thực phẩm.';
+          _suggestionError = 'KhÃ´ng tÃ¬m tháº¥y dá»¯ liá»‡u gá»‘c cá»§a thá»±c pháº©m.';
         });
       }
       return;
@@ -272,7 +272,7 @@ class _FoundObjectScreenState extends ConsumerState<FoundObjectScreen> {
         });
       }
 
-      // Lưu vĩnh viễn gợi ý vào SQLite và đồng bộ lên đám mây
+      // LÆ°u vÄ©nh viá»…n gá»£i Ã½ vÃ o SQLite vÃ  Ä‘á»“ng bá»™ lÃªn Ä‘Ã¡m mÃ¢y
       final updatedData = _currentData.copyWith(
         aiSuggestion: suggestion,
         isSynced: 0,
@@ -290,7 +290,7 @@ class _FoundObjectScreenState extends ConsumerState<FoundObjectScreen> {
     } catch (e) {
       if (mounted) {
         setState(() {
-          _suggestionError = 'Lỗi phân tích: $e';
+          _suggestionError = 'Lá»—i phÃ¢n tÃ­ch: $e';
           _isLoadingSuggestion = false;
         });
       }
@@ -302,7 +302,7 @@ class _FoundObjectScreenState extends ConsumerState<FoundObjectScreen> {
     final foodData = ref.read(foodRepositoryProvider).findFoodByName(selectedEgg.csvSearchName);
     if (foodData == null) return;
 
-    final String mainGroup = foodData['Nhóm Dinh Dưỡng Chính']?.toString().trim() ?? 'Protein, Chất béo';
+    final String mainGroup = foodData['NhÃ³m Dinh DÆ°á»¡ng ChÃ­nh']?.toString().trim() ?? 'Protein, Cháº¥t bÃ©o';
     final List<Map<String, dynamic>> nutritionArray = 
         ref.read(foodRepositoryProvider).buildNutritionArray(foodData, newWeight);
 
@@ -374,7 +374,7 @@ class _FoundObjectScreenState extends ConsumerState<FoundObjectScreen> {
                           const SizedBox(width: 8),
                           const Expanded(
                             child: Text(
-                              'Chọn Loại Trứng & Số Lượng',
+                              'Chá»n Loáº¡i Trá»©ng & Sá»‘ LÆ°á»£ng',
                               style: TextStyle(
                                 fontSize: 17,
                                 fontWeight: FontWeight.bold,
@@ -390,12 +390,12 @@ class _FoundObjectScreenState extends ConsumerState<FoundObjectScreen> {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        'Vui lòng chọn loại trứng bạn sử dụng để hệ thống tự động quy đổi khối lượng và giá trị dinh dưỡng chuẩn xác:',
+                        'Vui lÃ²ng chá»n loáº¡i trá»©ng báº¡n sá»­ dá»¥ng Ä‘á»ƒ há»‡ thá»‘ng tá»± Ä‘á»™ng quy Ä‘á»•i khá»‘i lÆ°á»£ng vÃ  giÃ¡ trá»‹ dinh dÆ°á»¡ng chuáº©n xÃ¡c:',
                         style: TextStyle(fontSize: 13, color: Colors.grey.shade600, height: 1.35),
                       ),
                       const SizedBox(height: 14),
 
-                      // 4 Tùy chọn trứng (Bỏ mô tả nhạt, thêm dấu ~ vào khối lượng)
+                      // 4 TÃ¹y chá»n trá»©ng (Bá» mÃ´ táº£ nháº¡t, thÃªm dáº¥u ~ vÃ o khá»‘i lÆ°á»£ng)
                       ...standardEggOptions.map((opt) {
                         final isSelected = opt.id == selectedOption.id;
                         return InkWell(
@@ -441,7 +441,7 @@ class _FoundObjectScreenState extends ConsumerState<FoundObjectScreen> {
                                     borderRadius: BorderRadius.circular(8),
                                   ),
                                   child: Text(
-                                    '~${opt.weightPerUnit.toInt()}g/quả',
+                                    '~${opt.weightPerUnit.toInt()}g/quáº£',
                                     style: TextStyle(
                                       fontSize: 12.5,
                                       fontWeight: FontWeight.bold,
@@ -459,7 +459,7 @@ class _FoundObjectScreenState extends ConsumerState<FoundObjectScreen> {
                       const Divider(),
                       const SizedBox(height: 8),
 
-                      // Stepper + Text Input (Chỉ nhập số nguyên, có thể gõ trực tiếp bàn phím)
+                      // Stepper + Text Input (Chá»‰ nháº­p sá»‘ nguyÃªn, cÃ³ thá»ƒ gÃµ trá»±c tiáº¿p bÃ n phÃ­m)
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
@@ -467,12 +467,12 @@ class _FoundObjectScreenState extends ConsumerState<FoundObjectScreen> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                'Số lượng quả:',
+                                'Sá»‘ lÆ°á»£ng quáº£:',
                                 style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFF1B233A)),
                               ),
                               SizedBox(height: 2),
                               Text(
-                                'Chạm vào số để nhập bàn phím',
+                                'Cháº¡m vÃ o sá»‘ Ä‘á»ƒ nháº­p bÃ n phÃ­m',
                                 style: TextStyle(fontSize: 11.5, color: Colors.grey),
                               ),
                             ],
@@ -533,7 +533,7 @@ class _FoundObjectScreenState extends ConsumerState<FoundObjectScreen> {
 
                       const SizedBox(height: 14),
 
-                      // Quy đổi khối lượng trực quan
+                      // Quy Ä‘á»•i khá»‘i lÆ°á»£ng trá»±c quan
                       Container(
                         width: double.infinity,
                         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
@@ -546,11 +546,11 @@ class _FoundObjectScreenState extends ConsumerState<FoundObjectScreen> {
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
                             const Text(
-                              'Quy đổi khối lượng:',
+                              'Quy Ä‘á»•i khá»‘i lÆ°á»£ng:',
                               style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFFC65102)),
                             ),
                             Text(
-                              '$quantity quả × ~${selectedOption.weightPerUnit.toInt()}g = ${currentWeight.toInt()}g',
+                              '$quantity quáº£ Ã— ~${selectedOption.weightPerUnit.toInt()}g = ${currentWeight.toInt()}g',
                               style: const TextStyle(
                                 fontSize: 14,
                                 fontWeight: FontWeight.bold,
@@ -563,7 +563,7 @@ class _FoundObjectScreenState extends ConsumerState<FoundObjectScreen> {
 
                       const SizedBox(height: 18),
 
-                      // Nút Áp dụng (Không ghi số lượng vào nút)
+                      // NÃºt Ãp dá»¥ng (KhÃ´ng ghi sá»‘ lÆ°á»£ng vÃ o nÃºt)
                       SizedBox(
                         width: double.infinity,
                         height: 48,
@@ -578,7 +578,7 @@ class _FoundObjectScreenState extends ConsumerState<FoundObjectScreen> {
                             elevation: 0,
                           ),
                           child: const Text(
-                            'ÁP DỤNG',
+                            'ÃP Dá»¤NG',
                             style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
                           ),
                         ),
@@ -645,7 +645,7 @@ class _FoundObjectScreenState extends ConsumerState<FoundObjectScreen> {
         builder: (ctx, setDialogState) {
           final totalWeight = _currentData.weight ?? 100.0;
           return AlertDialog(
-            title: const Text('Tùy chỉnh lượng ăn thực tế'),
+            title: const Text('TÃ¹y chá»‰nh lÆ°á»£ng Äƒn thá»±c táº¿'),
             content: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -662,7 +662,7 @@ class _FoundObjectScreenState extends ConsumerState<FoundObjectScreen> {
                     const SizedBox(width: 8),
                     Expanded(
                       child: ChoiceChip(
-                        label: const Center(child: Text('Theo số gam (g)', style: TextStyle(fontSize: 13))),
+                        label: const Center(child: Text('Theo sá»‘ gam', style: TextStyle(fontSize: 13))),
                         selected: mode == 1,
                         showCheckmark: false,
                         onSelected: (_) => setDialogState(() => mode = 1),
@@ -675,15 +675,15 @@ class _FoundObjectScreenState extends ConsumerState<FoundObjectScreen> {
                   controller: textController,
                   keyboardType: const TextInputType.numberWithOptions(decimal: true),
                   decoration: InputDecoration(
-                    labelText: mode == 0 ? 'Tỷ lệ % (1 - 100)' : 'Khối lượng ăn (g)',
-                    hintText: mode == 0 ? 'Ví dụ: 30' : 'Ví dụ: 120',
+                    labelText: mode == 0 ? 'Tá»· lá»‡ %' : 'Khá»‘i lÆ°á»£ng Äƒn',
+                    hintText: mode == 0 ? 'VÃ­ dá»¥: 30' : 'VÃ­ dá»¥: 120',
                     suffixText: mode == 0 ? '%' : 'g',
                     border: const OutlineInputBorder(),
                   ),
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Tổng khối lượng trên nhãn: ${totalWeight.toStringAsFixed(0)}g',
+                  'Tá»•ng khá»‘i lÆ°á»£ng trÃªn nhÃ£n: ${totalWeight.toStringAsFixed(0)}g',
                   style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
                 ),
               ],
@@ -691,9 +691,9 @@ class _FoundObjectScreenState extends ConsumerState<FoundObjectScreen> {
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(ctx, 1.0),
-                child: const Text('Đặt lại 100% (Nguyên khay)'),
+                child: const Text('Äáº·t láº¡i 100%'),
               ),
-              TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Đóng')),
+              TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('ÄÃ³ng')),
               ElevatedButton(
                 style: ElevatedButton.styleFrom(backgroundColor: Colors.green, foregroundColor: Colors.white),
                 onPressed: () {
@@ -707,7 +707,7 @@ class _FoundObjectScreenState extends ConsumerState<FoundObjectScreen> {
                     Navigator.pop(ctx, ratio);
                   }
                 },
-                child: const Text('Áp dụng'),
+                child: const Text('Ãp dá»¥ng'),
               ),
             ],
           );
@@ -746,7 +746,7 @@ class _FoundObjectScreenState extends ConsumerState<FoundObjectScreen> {
     return ActionChip(
       avatar: const Icon(Icons.edit, size: 14, color: Colors.blue),
       label: Text(
-        isStandard ? 'Tùy chỉnh...' : '${(_currentData.consumptionRatio * 100).round()}%',
+        isStandard ? 'TÃ¹y chá»‰nh...' : '${(_currentData.consumptionRatio * 100).round()}%',
         style: TextStyle(
           fontSize: 12,
           fontWeight: isStandard ? FontWeight.normal : FontWeight.bold,
@@ -763,15 +763,15 @@ class _FoundObjectScreenState extends ConsumerState<FoundObjectScreen> {
     final newWeightStr = await showDialog<String>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Nhập khối lượng mới (g)'),
+        title: const Text('Nháº­p khá»‘i lÆ°á»£ng má»›i'),
         content: TextField(
           controller: controller,
           keyboardType: TextInputType.number,
-          decoration: const InputDecoration(hintText: 'Ví dụ: 250'),
+          decoration: const InputDecoration(hintText: 'VÃ­ dá»¥: 250'),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Hủy')),
-          TextButton(onPressed: () => Navigator.pop(ctx, controller.text), child: const Text('Lưu')),
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Há»§y')),
+          TextButton(onPressed: () => Navigator.pop(ctx, controller.text), child: const Text('LÆ°u')),
         ],
       ),
     );
@@ -859,7 +859,7 @@ class _FoundObjectScreenState extends ConsumerState<FoundObjectScreen> {
         child: Container(
           height: 120,
           color: Colors.grey.shade200,
-          child: const Center(child: Text('Không có nhãn', style: TextStyle(color: Colors.grey))),
+          child: const Center(child: Text('KhÃ´ng cÃ³ nhÃ£n', style: TextStyle(color: Colors.grey))),
         ),
       );
     }
@@ -936,12 +936,12 @@ class _FoundObjectScreenState extends ConsumerState<FoundObjectScreen> {
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0,
-        title: const Text('Kết quả quét', style: TextStyle(color: Colors.black87, fontWeight: FontWeight.bold)),
+        title: const Text('Káº¿t quáº£ quÃ©t', style: TextStyle(color: Colors.black87, fontWeight: FontWeight.bold)),
         iconTheme: const IconThemeData(color: Colors.black87),
         actions: [
           IconButton(
             icon: const Icon(Icons.pie_chart_outline, color: Colors.green),
-            tooltip: 'Tiến trình dinh dưỡng ngày',
+            tooltip: 'Tiáº¿n trÃ¬nh dinh dÆ°á»¡ng ngÃ y',
             onPressed: () {
               Navigator.push(
                 context,
@@ -959,7 +959,7 @@ class _FoundObjectScreenState extends ConsumerState<FoundObjectScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // 1. Ảnh hiển thị
+              // 1. áº¢nh hiá»ƒn thá»‹
               Row(
                 children: [
                   Expanded(
@@ -975,7 +975,7 @@ class _FoundObjectScreenState extends ConsumerState<FoundObjectScreen> {
               ),
               const SizedBox(height: 16),
 
-              // 2. Tên món ăn và Khối lượng (Hiển thị số quả trứng ở dưới khối lượng)
+              // 2. TÃªn mÃ³n Äƒn vÃ  Khá»‘i lÆ°á»£ng (Hiá»ƒn thá»‹ sá»‘ quáº£ trá»©ng á»Ÿ dÆ°á»›i khá»‘i lÆ°á»£ng)
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
                 decoration: BoxDecoration(
@@ -1036,7 +1036,7 @@ class _FoundObjectScreenState extends ConsumerState<FoundObjectScreen> {
                           ),
                           icon: const Icon(Icons.egg_rounded, size: 18),
                           label: Text(
-                            'Loại: ${_matchedEggOption.displayName} • $_eggQuantity quả',
+                            'Loáº¡i: ${_matchedEggOption.displayName} â€¢ $_eggQuantity quáº£',
                             style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
                           ),
                         ),
@@ -1047,7 +1047,7 @@ class _FoundObjectScreenState extends ConsumerState<FoundObjectScreen> {
               ),
               const SizedBox(height: 12),
 
-              // 2.1. ĐƠN VỊ KHẨU PHẦN CHUẨN (Hiển thị tất cả quy đổi từ CSV, chỉ 1 dòng gọn gàng)
+              // 2.1. ÄÆ N Vá»Š KHáº¨U PHáº¦N CHUáº¨N (Hiá»ƒn thá»‹ táº¥t cáº£ quy Ä‘á»•i tá»« CSV, chá»‰ 1 dÃ²ng gá»n gÃ ng)
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                 decoration: BoxDecoration(
@@ -1088,7 +1088,7 @@ class _FoundObjectScreenState extends ConsumerState<FoundObjectScreen> {
               ),
               const SizedBox(height: 12),
 
-              // 2.2. THANH CHỌN HỆ SỐ TIÊU THỤ THỰC TẾ (gamma in (0, 1])
+              // 2.2. THANH CHá»ŒN Há»† Sá» TIÃŠU THá»¤ THá»°C Táº¾ (gamma in (0, 1])
               Container(
                 padding: const EdgeInsets.all(14),
                 decoration: BoxDecoration(
@@ -1107,7 +1107,7 @@ class _FoundObjectScreenState extends ConsumerState<FoundObjectScreen> {
                         const SizedBox(width: 6),
                         const Expanded(
                           child: Text(
-                            'Khẩu phần ăn thực tế',
+                            'Kháº©u pháº§n Äƒn thá»±c táº¿',
                             style: TextStyle(
                               fontSize: 14,
                               fontWeight: FontWeight.bold,
@@ -1128,7 +1128,7 @@ class _FoundObjectScreenState extends ConsumerState<FoundObjectScreen> {
                                 children: [
                                   const Icon(Icons.refresh, size: 14, color: Colors.grey),
                                   const SizedBox(width: 2),
-                                  Text('Đặt lại', style: TextStyle(fontSize: 12, color: Colors.grey.shade700)),
+                                  Text('Äáº·t láº¡i', style: TextStyle(fontSize: 12, color: Colors.grey.shade700)),
                                 ],
                               ),
                             ),
@@ -1139,7 +1139,7 @@ class _FoundObjectScreenState extends ConsumerState<FoundObjectScreen> {
                     const SizedBox(height: 10),
 
                     if (_isEggFood) ...[
-                      // Ô nhập số cho người dùng tự nhập số quả thực tế (hỗ trợ số thập phân, nút cộng trừ ở bên phải)
+                      // Ã” nháº­p sá»‘ cho ngÆ°á»i dÃ¹ng tá»± nháº­p sá»‘ quáº£ thá»±c táº¿ (há»— trá»£ sá»‘ tháº­p phÃ¢n, nÃºt cá»™ng trá»« á»Ÿ bÃªn pháº£i)
                       Row(
                         children: [
                           Expanded(
@@ -1149,8 +1149,8 @@ class _FoundObjectScreenState extends ConsumerState<FoundObjectScreen> {
                               decoration: InputDecoration(
                                 isDense: true,
                                 contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                                labelText: 'Số quả ăn thực tế',
-                                suffixText: 'quả',
+                                labelText: 'Sá»‘ quáº£ Äƒn thá»±c táº¿',
+                                suffixText: 'quáº£',
                                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
                               ),
                               onChanged: _onEggPortionChanged,
@@ -1185,11 +1185,11 @@ class _FoundObjectScreenState extends ConsumerState<FoundObjectScreen> {
                       ),
                       const SizedBox(height: 6),
                       Text(
-                        'Ăn ${_eggEatenCount.toStringAsFixed(1).replaceAll('.0', '')} quả trứng (tương đương ${actualW.toStringAsFixed(0)}g)',
+                        'Ä‚n ${_eggEatenCount.toStringAsFixed(1).replaceAll('.0', '')} quáº£ trá»©ng • g',
                         style: TextStyle(fontSize: 12, color: Colors.grey.shade700, fontWeight: FontWeight.w500),
                       ),
                     ] else ...[
-                      // Các nút chọn phần trăm gọn gàng (không phân số)
+                      // CÃ¡c nÃºt chá»n pháº§n trÄƒm gá»n gÃ ng (khÃ´ng phÃ¢n sá»‘)
                       Wrap(
                         spacing: 8,
                         runSpacing: 6,
@@ -1205,7 +1205,7 @@ class _FoundObjectScreenState extends ConsumerState<FoundObjectScreen> {
 
                     const SizedBox(height: 14),
 
-                    // Nút Thêm vào thực đơn hôm nay
+                    // NÃºt ThÃªm vÃ o thá»±c Ä‘Æ¡n hÃ´m nay
                     SizedBox(
                       width: double.infinity,
                       child: ElevatedButton.icon(
@@ -1219,7 +1219,7 @@ class _FoundObjectScreenState extends ConsumerState<FoundObjectScreen> {
                         ),
                         icon: Icon(_isAddedToMenu ? Icons.check_circle_outline : Icons.add_circle_outline, size: 18),
                         label: Text(
-                          _isAddedToMenu ? 'Đã có trong thực đơn hôm nay' : 'Thêm vào thực đơn hôm nay',
+                          _isAddedToMenu ? 'ÄÃ£ cÃ³ trong thá»±c Ä‘Æ¡n hÃ´m nay' : 'ThÃªm vÃ o thá»±c Ä‘Æ¡n hÃ´m nay',
                           style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
                         ),
                       ),
@@ -1229,7 +1229,7 @@ class _FoundObjectScreenState extends ConsumerState<FoundObjectScreen> {
               ),
               const SizedBox(height: 16),
 
-              // 3. Card Năng lượng
+              // 3. Card NÄƒng lÆ°á»£ng
               Container(
                 padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12), border: const Border(left: BorderSide(color: Colors.red, width: 4))),
@@ -1238,7 +1238,7 @@ class _FoundObjectScreenState extends ConsumerState<FoundObjectScreen> {
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text('Tổng Năng Lượng', style: TextStyle(fontSize: 14, color: Colors.black87)),
+                        const Text('Tá»•ng NÄƒng LÆ°á»£ng', style: TextStyle(fontSize: 14, color: Colors.black87)),
                         const SizedBox(height: 8),
                         Text('${(((energy['per_label'] as num?)?.toDouble() ?? 0) * cRatio).toStringAsFixed(0)} ${energy['unit'] == 'kcal' ? 'Kcal' : energy['unit']}', style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Color(0xFFD32F2F))),
                       ],
@@ -1248,12 +1248,12 @@ class _FoundObjectScreenState extends ConsumerState<FoundObjectScreen> {
               ),
               const SizedBox(height: 12),
 
-              // 4. Grid 4 chất (Đã nhân hệ số tiêu thụ thực tế gamma)
+              // 4. Grid 4 cháº¥t (ÄÃ£ nhÃ¢n há»‡ sá»‘ tiÃªu thá»¥ thá»±c táº¿ gamma)
               Row(
                 children: [
                   Expanded(child: _buildNutrientCard('Protein', '${(((protein['per_label'] as num?)?.toDouble() ?? 0) * cRatio).toStringAsFixed(1)}${protein['unit']}', Colors.purple)),
                   const SizedBox(width: 12),
-                  Expanded(child: _buildNutrientCard('Chất béo (Fat)', '${(((fat['per_label'] as num?)?.toDouble() ?? 0) * cRatio).toStringAsFixed(1)}${fat['unit']}', Colors.orange)),
+                  Expanded(child: _buildNutrientCard('Cháº¥t bÃ©o (Fat)', '${(((fat['per_label'] as num?)?.toDouble() ?? 0) * cRatio).toStringAsFixed(1)}${fat['unit']}', Colors.orange)),
                 ],
               ),
               const SizedBox(height: 12),
@@ -1261,26 +1261,26 @@ class _FoundObjectScreenState extends ConsumerState<FoundObjectScreen> {
                 children: [
                   Expanded(child: _buildNutrientCard('Carb', '${(((carb['per_label'] as num?)?.toDouble() ?? 0) * cRatio).toStringAsFixed(1)}${carb['unit']}', Colors.blue)),
                   const SizedBox(width: 12),
-                  Expanded(child: _buildNutrientCard('Chất xơ', '${(((fiber['per_label'] as num?)?.toDouble() ?? 0) * cRatio).toStringAsFixed(1)}${fiber['unit']}', Colors.green)),
+                  Expanded(child: _buildNutrientCard('Cháº¥t xÆ¡', '${(((fiber['per_label'] as num?)?.toDouble() ?? 0) * cRatio).toStringAsFixed(1)}${fiber['unit']}', Colors.green)),
                 ],
               ),
               const SizedBox(height: 32),
 
-              // 5. Nút xem chi tiết (Dạng chữ)
+              // 5. NÃºt xem chi tiáº¿t (Dáº¡ng chá»¯)
               TextButton(
                 onPressed: () {
                   Navigator.push(context, MaterialPageRoute(builder: (context) => ResultScreen(resultData: _currentData)));
                 },
-                child: const Text('Xem chi tiết giá trị dinh dưỡng >', style: TextStyle(color: Colors.green, fontSize: 16, fontWeight: FontWeight.bold)),
+                child: const Text('Xem chi tiáº¿t giÃ¡ trá»‹ dinh dÆ°á»¡ng >', style: TextStyle(color: Colors.green, fontSize: 16, fontWeight: FontWeight.bold)),
               ),
               const SizedBox(height: 20),
 
-              // 6. Gợi ý tư vấn dinh dưỡng
+              // 6. Gá»£i Ã½ tÆ° váº¥n dinh dÆ°á»¡ng
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   const Text(
-                    'TƯ VẤN DINH DƯỠNG',
+                    'TÆ¯ Váº¤N DINH DÆ¯á» NG',
                     style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.green),
                   ),
                   TextButton.icon(
@@ -1293,7 +1293,7 @@ class _FoundObjectScreenState extends ConsumerState<FoundObjectScreen> {
                           )
                         : const Icon(Icons.refresh, size: 18, color: Colors.green),
                     label: const Text(
-                      'Cập nhật',
+                      'Cáº­p nháº­t',
                       style: TextStyle(
                         color: Colors.green,
                         fontWeight: FontWeight.bold,
@@ -1335,7 +1335,7 @@ class _FoundObjectScreenState extends ConsumerState<FoundObjectScreen> {
                             const SizedBox(width: 12),
                             const Expanded(
                               child: Text(
-                                'Bạn cần nhập thông số cá nhân để có thể nhận được gợi ý dinh dưỡng.',
+                                'Báº¡n cáº§n nháº­p thÃ´ng sá»‘ cÃ¡ nhÃ¢n Ä‘á»ƒ cÃ³ thá»ƒ nháº­n Ä‘Æ°á»£c gá»£i Ã½ dinh dÆ°á»¡ng.',
                                 style: TextStyle(
                                   fontSize: 14,
                                   fontWeight: FontWeight.w600,
@@ -1371,7 +1371,7 @@ class _FoundObjectScreenState extends ConsumerState<FoundObjectScreen> {
                           SizedBox(width: 16),
                           Expanded(
                             child: Text(
-                              'Đang kết nối chuyên gia AI để phân tích dinh dưỡng...',
+                              'Äang káº¿t ná»‘i chuyÃªn gia AI Ä‘á»ƒ phÃ¢n tÃ­ch dinh dÆ°á»¡ng...',
                               style: TextStyle(fontSize: 14, color: Colors.black54),
                             ),
                           ),
@@ -1397,7 +1397,7 @@ class _FoundObjectScreenState extends ConsumerState<FoundObjectScreen> {
                           ElevatedButton.icon(
                             onPressed: _fetchSuggestion,
                             icon: const Icon(Icons.refresh, size: 16, color: Colors.white),
-                            label: const Text('Thử lại', style: TextStyle(color: Colors.white)),
+                            label: const Text('Thá»­ láº¡i', style: TextStyle(color: Colors.white)),
                             style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
                           ),
                         ],
@@ -1427,12 +1427,12 @@ class _FoundObjectScreenState extends ConsumerState<FoundObjectScreen> {
                           Icon(Icons.psychology_outlined, size: 40, color: Colors.green.shade600),
                           const SizedBox(height: 10),
                           const Text(
-                            'Chưa tải lời khuyên dinh dưỡng cho món này.',
+                            'ChÆ°a táº£i lá»i khuyÃªn dinh dÆ°á»¡ng cho mÃ³n nÃ y.',
                             style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Colors.black87),
                           ),
                           const SizedBox(height: 6),
                           const Text(
-                            'Nhấn nút "Cập nhật" ở trên để chuyên gia AI phân tích thực phẩm theo thể trạng và bệnh lý của bạn.',
+                            'Nháº¥n nÃºt "Cáº­p nháº­t" á»Ÿ trÃªn Ä‘á»ƒ chuyÃªn gia AI phÃ¢n tÃ­ch thá»±c pháº©m theo thá»ƒ tráº¡ng vÃ  bá»‡nh lÃ½ cá»§a báº¡n.',
                             textAlign: TextAlign.center,
                             style: TextStyle(color: Colors.black54, fontSize: 13),
                           ),
@@ -1440,7 +1440,7 @@ class _FoundObjectScreenState extends ConsumerState<FoundObjectScreen> {
                           ElevatedButton.icon(
                             onPressed: _fetchSuggestion,
                             icon: const Icon(Icons.auto_awesome, color: Colors.white, size: 18),
-                            label: const Text('Nhận tư vấn từ Chuyên gia AI', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                            label: const Text('Nháº­n tÆ° váº¥n tá»« ChuyÃªn gia AI', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
                             style: ElevatedButton.styleFrom(
                               backgroundColor: Colors.green,
                               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
@@ -1452,17 +1452,17 @@ class _FoundObjectScreenState extends ConsumerState<FoundObjectScreen> {
                     );
                   }
 
-                  final bool isOffline = suggestionStr.contains('📶');
-                  final bool hasVeto = suggestionStr.contains('⛔') || suggestionStr.contains('🚨');
-                  final bool hasWarning = suggestionStr.contains('⚠️');
+                  final bool isOffline = suggestionStr.contains('ðŸ“¶');
+                  final bool hasVeto = suggestionStr.contains('â›”') || suggestionStr.contains('ðŸš¨');
+                  final bool hasWarning = suggestionStr.contains('âš ï¸');
                   final Color borderColor = hasVeto 
                       ? Colors.red 
                       : (hasWarning ? Colors.orange : (isOffline ? Colors.grey : Colors.green));
                   final String headerTitle = hasVeto 
-                      ? '🚨 CẢNH BÁO Y TẾ ĐẶC BIỆT' 
+                      ? 'ðŸš¨ Cáº¢NH BÃO Y Táº¾ Äáº¶C BIá»†T' 
                       : (hasWarning 
-                          ? '⚠️ LƯU Ý SỨC KHỎE' 
-                          : (isOffline ? '📶 CHƯA CÓ KẾT NỐI MẠNG' : '💡 Lời khuyên từ chuyên gia AI'));
+                          ? 'âš ï¸ LÆ¯U Ã Sá»¨C KHá»ŽE' 
+                          : (isOffline ? 'ðŸ“¶ CHÆ¯A CÃ“ Káº¾T Ná»I Máº NG' : 'ðŸ’¡ Lá»i khuyÃªn tá»« chuyÃªn gia AI'));
                   
                   return Container(
                     width: double.infinity,
@@ -1486,7 +1486,7 @@ class _FoundObjectScreenState extends ConsumerState<FoundObjectScreen> {
               ),
               const SizedBox(height: 20),
 
-              // NÚT CHUYỂN SANG TIẾN TRÌNH DINH DƯỠNG NGÀY
+              // NÃšT CHUYá»‚N SANG TIáº¾N TRÃŒNH DINH DÆ¯á» NG NGÃ€Y
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton.icon(
@@ -1506,7 +1506,7 @@ class _FoundObjectScreenState extends ConsumerState<FoundObjectScreen> {
                   },
                   icon: const Icon(Icons.pie_chart_outline),
                   label: const Text(
-                    'Xem Tiến trình Dinh dưỡng Ngày Hôm Nay',
+                    'Xem Tiáº¿n trÃ¬nh Dinh dÆ°á»¡ng NgÃ y HÃ´m Nay',
                     style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
                   ),
                 ),

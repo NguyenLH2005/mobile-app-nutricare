@@ -66,7 +66,7 @@ class ResultScreen extends StatelessWidget {
                       ),
                       child: Text(
                         resultData.consumptionRatio < 1.0
-                            ? 'Khối lượng tiêu thụ: ${resultData.actualWeight.toStringAsFixed(0)}g (ăn ${(resultData.consumptionRatio * 100).round()}% khay)'
+                            ? 'Khối lượng tiêu thụ: ${resultData.actualWeight.toStringAsFixed(0)}g • Ăn ${(resultData.consumptionRatio * 100).round()}% khay'
                             : 'Khối lượng nhận diện: ${resultData.formatWeight(spaceBeforeUnit: false)}',
                         style: TextStyle(
                           fontSize: 16,

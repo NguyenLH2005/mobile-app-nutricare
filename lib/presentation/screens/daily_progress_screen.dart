@@ -425,7 +425,7 @@ class _DailyProgressScreenState extends ConsumerState<DailyProgressScreen> {
                     ),
                   ),
                   Text(
-                    'Đã nạp (kcal)',
+                    'Đã nạp',
                     style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
                   ),
                 ],
@@ -442,7 +442,7 @@ class _DailyProgressScreenState extends ConsumerState<DailyProgressScreen> {
                     ),
                   ),
                   Text(
-                    'Mục tiêu E_goal',
+                    'Mục tiêu',
                     style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
                   ),
                 ],
@@ -459,7 +459,7 @@ class _DailyProgressScreenState extends ConsumerState<DailyProgressScreen> {
                     ),
                   ),
                   Text(
-                    isOver ? 'Vượt chỉ tiêu' : 'Còn thiếu (R_E)',
+                    isOver ? 'Vượt chỉ tiêu' : 'Còn thiếu',
                     style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
                   ),
                 ],
@@ -508,7 +508,7 @@ class _DailyProgressScreenState extends ConsumerState<DailyProgressScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text(
-            'Tiến trình các chất đa lượng (Q_day / G_j)',
+            'Tiến trình các chất đa lượng',
             style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF1B233A)),
           ),
           const SizedBox(height: 14),
@@ -723,7 +723,7 @@ class _DailyProgressScreenState extends ConsumerState<DailyProgressScreen> {
     // Cảnh báo Natri
     if (intake['sodium']! > profile.ceilingSodium) {
       alerts.add(_buildAlertBanner(
-        title: 'CẢNH BÁO: Vượt trần Natri (${intake['sodium']!.toStringAsFixed(0)} / ${profile.ceilingSodium.toStringAsFixed(0)} mg)',
+        title: 'CẢNH BÁO: Vượt trần Natri: ${intake['sodium']!.toStringAsFixed(0)} / ${profile.ceilingSodium.toStringAsFixed(0)} mg',
         desc: 'Hàm lượng muối nạp trong ngày đã chạm hoặc vượt ngưỡng an toàn y tế. Hãy hạn chế chấm muối và nước chấm đậm trong các bữa còn lại.',
         color: Colors.red,
       ));
@@ -732,7 +732,7 @@ class _DailyProgressScreenState extends ConsumerState<DailyProgressScreen> {
     // Cảnh báo Đường
     if (intake['sugar']! > profile.ceilingSugar) {
       alerts.add(_buildAlertBanner(
-        title: 'CẢNH BÁO: Vượt trần Đường (${intake['sugar']!.toStringAsFixed(1)} / ${profile.ceilingSugar.toStringAsFixed(1)} g)',
+        title: 'CẢNH BÁO: Vượt trần Đường: ${intake['sugar']!.toStringAsFixed(1)} / ${profile.ceilingSugar.toStringAsFixed(1)} g',
         desc: 'Lượng đường tự do nạp vào vượt mức khuyến nghị của WHO. Tránh uống nước ngọt, trà sữa hoặc đồ ngọt trong phần còn lại của ngày.',
         color: Colors.amber.shade900,
       ));
@@ -742,7 +742,7 @@ class _DailyProgressScreenState extends ConsumerState<DailyProgressScreen> {
     final bool hasKidney = profile.medicalFlags.length > 4 && profile.medicalFlags[4] == '1';
     if (hasKidney && intake['protein']! > profile.ceilingProteinKidney && profile.ceilingProteinKidney > 0) {
       alerts.add(_buildAlertBanner(
-        title: 'CẢNH BÁO KDIGO: Vượt trần đạm bệnh Thận (${intake['protein']!.toStringAsFixed(1)} / ${profile.ceilingProteinKidney.toStringAsFixed(1)} g)',
+        title: 'CẢNH BÁO KDIGO: Vượt trần đạm bệnh Thận: ${intake['protein']!.toStringAsFixed(1)} / ${profile.ceilingProteinKidney.toStringAsFixed(1)} g',
         desc: 'Khuyến cáo KDIGO giới hạn 0.8g đạm/kg để tránh tăng áp lực lọc cầu thận. Vui lòng giảm lượng thịt, cá, trứng trong các bữa tiếp theo.',
         color: Colors.deepOrange,
       ));
@@ -802,7 +802,7 @@ class _DailyProgressScreenState extends ConsumerState<DailyProgressScreen> {
           children: [
             Expanded(
               child: Text(
-                'Thực phẩm đã ghi nhận (${_dailyScans.length})',
+                'Thực phẩm đã ghi nhận: ${_dailyScans.length}',
                 style: const TextStyle(
                   fontSize: 15,
                   fontWeight: FontWeight.bold,
@@ -956,7 +956,7 @@ class _DailyProgressScreenState extends ConsumerState<DailyProgressScreen> {
                       if (scan.consumptionRatio < 1.0) ...[
                         const SizedBox(width: 4),
                         Text(
-                          '(${((scan.consumptionRatio) * 100).round()}% khay)',
+                          '• ${((scan.consumptionRatio) * 100).round()}% khay',
                           style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
                         ),
                       ],

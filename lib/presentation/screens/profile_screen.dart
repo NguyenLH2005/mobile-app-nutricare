@@ -76,11 +76,11 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   }
 
   String _getActivityFactorText(double factor) {
-    if (factor <= 1.2) return 'Ít vận động (làm việc văn phòng)';
-    if (factor <= 1.375) return 'Vận động nhẹ (tập 1-3 ngày/tuần)';
-    if (factor <= 1.55) return 'Vận động vừa (tập 3-5 ngày/tuần)';
-    if (factor <= 1.725) return 'Vận động nhiều (tập 6-7 ngày/tuần)';
-    return 'Vận động rất nhiều (tập nặng 2 lần/ngày)';
+    if (factor <= 1.2) return 'Ít vận động - Làm việc văn phòng';
+    if (factor <= 1.375) return 'Vận động nhẹ - Tập 1-3 ngày/tuần';
+    if (factor <= 1.55) return 'Vận động vừa - Tập 3-5 ngày/tuần';
+    if (factor <= 1.725) return 'Vận động nhiều - Tập 6-7 ngày/tuần';
+    return 'Vận động rất nhiều - Tập nặng 2 lần/ngày';
   }
 
   @override
@@ -356,7 +356,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                         style: TextStyle(fontWeight: FontWeight.w600),
                       ),
                       TextSpan(
-                        text: '${_getActivityFactorText(profile.activityFactor)} (Hệ số vận động: ${profile.activityFactor})',
+                        text: '${_getActivityFactorText(profile.activityFactor)} • Hệ số vận động: ${profile.activityFactor}',
                       ),
                     ],
                   ),
@@ -386,7 +386,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                       ),
                       if (isObesityOn)
                         TextSpan(
-                          text: ' (Khóa chế độ giảm cân)',
+                          text: ' • Khóa chế độ giảm cân',
                           style: TextStyle(fontSize: 12, color: Colors.orange.shade800, fontStyle: FontStyle.italic),
                         ),
                     ],
@@ -401,7 +401,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           _buildExpandableMetricRow(
             title: 'Chỉ số BMI',
             subtitle: 'Chỉ số khối cơ thể',
-            value: '${bmi.toStringAsFixed(1)} ($bmiCategory)',
+            value: '${bmi.toStringAsFixed(1)} • $bmiCategory',
             valueColor: bmiColor,
             explanationKey: 'bmi',
             definitionText: 'BMI là chỉ số đo lường mức độ tương quan giữa chiều cao và cân nặng để đánh giá độ gầy béo của cơ thể.',
@@ -480,7 +480,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                             ? (isObesityOn
                                 ? 'Đang bật: Thâm hụt 500 kcal, trần đường <= 5%'
                                 : 'Gợi ý bật để can thiệp giảm mỡ và cân bằng chuyển hóa')
-                            : 'Vô hiệu hóa: Chỉ khả dụng khi BMI >= 23 (Tiền béo phì / Béo phì)',
+                            : 'Vô hiệu hóa: Chỉ khả dụng khi BMI >= 23 • Tiền béo phì / Béo phì',
                         style: TextStyle(
                           fontSize: 11.5,
                           color: canEnableObesity ? Colors.grey.shade700 : Colors.grey.shade500,
@@ -836,14 +836,14 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             value: '<= ${profile.ceilingSugar.toStringAsFixed(1)} g/ngày',
             isAffected: hasDiabetes || profile.isObesityMode,
             reason: hasDiabetes
-                ? 'Do bạn mắc bệnh Tiểu đường (khống chế <= 5% calo)'
-                : (profile.isObesityMode ? 'Do chế độ kiểm soát béo phì (khống chế <= 5% calo)' : null),
+                ? 'Do bạn mắc bệnh Tiểu đường • Khống chế <= 5% calo'
+                : (profile.isObesityMode ? 'Do chế độ kiểm soát béo phì • Khống chế <= 5% calo' : null),
           ),
           const Divider(height: 12),
 
           // Natri
           _buildCeilingRow(
-            label: 'Natri (Muối)',
+            label: 'Natri / Muối',
             value: '<= ${profile.ceilingSodium.toStringAsFixed(0)} mg/ngày',
             isAffected: hasHypertension || hasCardio,
             reason: (hasHypertension && hasCardio)
@@ -859,7 +859,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             label: 'Chất béo bão hòa (Saturated Fat)',
             value: '<= ${profile.ceilingSatFat.toStringAsFixed(1)} g/ngày',
             isAffected: hasLipid,
-            reason: hasLipid ? 'Do bạn mắc bệnh Rối loạn lipid máu/Mỡ máu (< 7% calo)' : null,
+            reason: hasLipid ? 'Do bạn mắc bệnh Rối loạn lipid máu/Mỡ máu • Dưới 7% calo' : null,
           ),
           const Divider(height: 12),
 
@@ -868,7 +868,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             label: 'Kali (Potassium)',
             value: hasKidney ? '<= 2000 mg/ngày' : '3500 - 4700 mg/ngày',
             isAffected: hasKidney,
-            reason: hasKidney ? 'Do bạn mắc bệnh Thận mạn (Thận giảm khả năng bài tiết Kali)' : null,
+            reason: hasKidney ? 'Do bạn mắc bệnh Thận mạn • Giảm khả năng bài tiết Kali' : null,
           ),
           const Divider(height: 12),
 
@@ -877,7 +877,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             label: 'Photpho (Phosphorus)',
             value: hasKidney ? '<= 800 mg/ngày' : '700 - 1000 mg/ngày',
             isAffected: hasKidney,
-            reason: hasKidney ? 'Do bạn mắc bệnh Thận mạn (Ngừa lắng đọng khoáng chất)' : null,
+            reason: hasKidney ? 'Do bạn mắc bệnh Thận mạn • Ngừa lắng đọng khoáng chất' : null,
           ),
 
           // Đạm thận (nếu có bệnh thận)
@@ -887,7 +887,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               label: 'Chất đạm (Protein)',
               value: '<= ${profile.ceilingProteinKidney.toStringAsFixed(1)} g/ngày',
               isAffected: true,
-              reason: 'Do bạn mắc bệnh Thận mạn (Kiểm soát 0.8g/kg/ngày theo KDIGO 2024)',
+              reason: 'Do bạn mắc bệnh Thận mạn • Kiểm soát 0.8g/kg/ngày theo KDIGO 2024',
             ),
           ],
 
@@ -895,10 +895,10 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           if (hasGout) ...[
             const Divider(height: 12),
             _buildCeilingRow(
-              label: 'Đạm giàu Purine (Bệnh Gout)',
+              label: 'Đạm giàu Purine - Bệnh Gout',
               value: '<= 25 g/bữa ăn',
               isAffected: true,
-              reason: 'Do bạn mắc bệnh Gout (hạn chế thịt đỏ, hải sản vỏ cứng để tránh kích hoạt cơn Gout cấp)',
+              reason: 'Do bạn mắc bệnh Gout • Hạn chế thịt đỏ, hải sản vỏ cứng để tránh kích hoạt cơn Gout cấp',
             ),
           ],
 
@@ -909,8 +909,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             value: '>= ${profile.budgetFiber.toStringAsFixed(0)} g/ngày',
             isAffected: profile.isObesityMode || hasDiabetes || hasLipid,
             reason: (profile.isObesityMode || hasDiabetes || hasLipid)
-                ? 'Khuyến nghị tăng cường chất xơ (giúp ổn định đường huyết, kiểm soát cân nặng & giảm mỡ máu)'
-                : 'Mức khuyến nghị tối thiểu bảo vệ hệ tiêu hóa của Viện Dinh Dưỡng (NIN)',
+                ? 'Khuyến nghị tăng cường chất xơ giúp ổn định đường huyết, kiểm soát cân nặng & giảm mỡ máu'
+                : 'Mức khuyến nghị tối thiểu bảo vệ hệ tiêu hóa của Viện Dinh Dưỡng NIN',
           ),
         ],
       ),

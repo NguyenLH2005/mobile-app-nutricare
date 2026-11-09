@@ -287,7 +287,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
                                     if (item.weight != null)
                                       Text(
                                         item.consumptionRatio < 0.99
-                                            ? 'Ăn: ${item.actualWeight.toStringAsFixed(0)}g (${(item.consumptionRatio * 100).round()}% khay)'
+                                            ? 'Ăn: ${item.actualWeight.toStringAsFixed(0)}g • ${(item.consumptionRatio * 100).round()}% khay'
                                             : item.formatWeight(spaceBeforeUnit: false),
                                         style: TextStyle(
                                           color: item.consumptionRatio < 0.99 ? Colors.green.shade700 : Colors.grey.shade600,
