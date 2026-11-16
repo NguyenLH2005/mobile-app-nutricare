@@ -70,25 +70,9 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
   }
 
   Future<void> _selectDate(BuildContext context) async {
-    DateTime initial = DateTime(2000, 1, 1);
-    if (_dobController.text.isNotEmpty) {
-      final text = _dobController.text.trim();
-      if (text.contains('/')) {
-        final parts = text.split('/');
-        if (parts.length == 3) {
-          final d = int.tryParse(parts[0]);
-          final m = int.tryParse(parts[1]);
-          final y = int.tryParse(parts[2]);
-          if (d != null && m != null && y != null) {
-            initial = DateTime(y, m, d);
-          }
-        }
-      } else {
-        try {
-          initial = DateTime.parse(text);
-        } catch (_) {}
-      }
-    }
+    final initial = _dobController.text.isNotEmpty
+        ? (UserProfile.parseDob(_dobController.text) ?? DateTime(2000, 1, 1))
+        : DateTime(2000, 1, 1);
 
     final picked = await showDatePicker(
       context: context,
@@ -108,8 +92,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
     final w = double.tryParse(_weightController.text);
     final h = double.tryParse(_heightController.text);
     if (w != null && h != null && h > 0) {
-      final hm = h / 100.0;
-      return w / (hm * hm);
+      return UserProfile.calculateBmi(w, h);
     }
     return null;
   }
@@ -155,10 +138,8 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
   @override
   Widget build(BuildContext context) {
     final currentBmi = _calculateCurrentBmi();
-    final bool isOverweightOrObese = currentBmi != null && currentBmi >= 23.0;
-    final bool hasGoalConflict = isOverweightOrObese &&
-        ((currentBmi >= 25.0 && _goal != 'Giảm cân') ||
-         (currentBmi >= 23.0 && _goal == 'Tăng cân'));
+    final bool hasGoalConflict =
+        currentBmi != null && UserProfile.hasGoalConflictWithBmi(currentBmi, _goal);
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -294,28 +275,9 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                   prefixIcon: Icon(Icons.directions_run_outlined),
                 ),
                 isExpanded: true,
-                items: const [
-                  DropdownMenuItem(
-                    value: 1.2,
-                    child: Text('Ít vận động - Làm việc văn phòng'),
-                  ),
-                  DropdownMenuItem(
-                    value: 1.375,
-                    child: Text('Vận động nhẹ - Tập nhẹ 1-3 ngày/tuần'),
-                  ),
-                  DropdownMenuItem(
-                    value: 1.55,
-                    child: Text('Vận động vừa - Tập vừa 3-5 ngày/tuần'),
-                  ),
-                  DropdownMenuItem(
-                    value: 1.725,
-                    child: Text('Vận động nhiều - Tập nặng 6-7 ngày/tuần'),
-                  ),
-                  DropdownMenuItem(
-                    value: 1.9,
-                    child: Text('Vận động rất nhiều - VĐV, tập 2 lần/ngày'),
-                  ),
-                ],
+                items: UserProfile.activityLevels
+                    .map((level) => DropdownMenuItem(value: level.factor, child: Text(level.label)))
+                    .toList(),
                 onChanged: (val) => setState(() => _activityFactor = val!),
               ),
               const SizedBox(height: 16),
@@ -441,14 +403,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
               Wrap(
                 spacing: 8.0,
                 runSpacing: 6.0,
-                children: [
-                  'Tiểu đường',
-                  'Huyết áp cao',
-                  'Mỡ máu',
-                  'Tim mạch',
-                  'Gout',
-                  'Bệnh Thận',
-                ].map((disease) {
+                children: UserProfile.standardMedicalConditions.map((disease) {
                   final isSelected = _selectedDiseases.contains(disease);
                   return FilterChip(
                     label: Text(disease),

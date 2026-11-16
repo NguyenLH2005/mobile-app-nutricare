@@ -17,6 +17,7 @@ class ScanHistory {
   final double consumptionRatio; // Hệ số tiêu thụ gamma (mặc định 1.0)
   final String? logDate; // Ngày tiêu thụ dạng YYYY-MM-DD
   final bool isInMenu; // Đã thêm vào thực đơn/tiến độ ngày hay chỉ lưu lịch sử tra cứu
+  final String? cookingMethod; // Phương pháp chế biến (Tươi, Luộc, Hấp, Nướng...)
   final String nutritionData;
   final String mainGroup; // Nhóm dinh dưỡng chính (từ CSV)
   final DateTime createdAt;
@@ -38,6 +39,7 @@ class ScanHistory {
     this.consumptionRatio = 1.0,
     this.logDate,
     this.isInMenu = false,
+    this.cookingMethod,
     required this.nutritionData,
     required this.mainGroup,
     required this.createdAt,
@@ -45,11 +47,19 @@ class ScanHistory {
     this.updatedAt,
   });
 
+  double get effectiveConsumptionRatio => consumptionRatio > 0 ? consumptionRatio : 1.0;
+
   /// Khối lượng thực phẩm thực tế ăn vào: m_consumed = gamma * m_label
-  double get actualWeight => (weight ?? 100.0) * (consumptionRatio > 0 ? consumptionRatio : 1.0);
+  double get actualWeight => (weight ?? 100.0) * effectiveConsumptionRatio;
+
+  String get capitalizedFoodName =>
+      foodName.isNotEmpty ? '${foodName[0].toUpperCase()}${foodName.substring(1)}' : '';
+
+  static String formatDateYmd(DateTime dt) =>
+      '${dt.year.toString().padLeft(4, '0')}-${dt.month.toString().padLeft(2, '0')}-${dt.day.toString().padLeft(2, '0')}';
 
   Map<String, dynamic> toMap() {
-    final effectiveDate = logDate ?? createdAt.toIso8601String().substring(0, 10);
+    final effectiveDate = logDate ?? formatDateYmd(createdAt);
     return {
       'id': id,
       'original_image': originalImage,
@@ -65,6 +75,7 @@ class ScanHistory {
       'consumption_ratio': consumptionRatio,
       'log_date': effectiveDate,
       'is_in_menu': isInMenu ? 1 : 0,
+      'cooking_method': cookingMethod,
       'nutrition_data': nutritionData,
       'main_group': mainGroup,
       'created_at': createdAt.toIso8601String(),
@@ -94,8 +105,9 @@ class ScanHistory {
       weight: map['weight'] != null ? (map['weight'] as num).toDouble() : null,
       servingUnits: map['serving_units'] != null ? (map['serving_units'] as num).toDouble() : null,
       consumptionRatio: map['consumption_ratio'] != null ? (map['consumption_ratio'] as num).toDouble() : 1.0,
-      logDate: map['log_date'] ?? created.toIso8601String().substring(0, 10),
+      logDate: map['log_date'] ?? formatDateYmd(created),
       isInMenu: map['is_in_menu'] == 1 || map['is_in_menu'] == true,
+      cookingMethod: map['cooking_method'] ?? map['cookingMethod'],
       nutritionData: map['nutrition_data'] ?? '[]',
       mainGroup: map['main_group'] ?? 'Chưa phân loại',
       createdAt: created,
@@ -119,6 +131,7 @@ class ScanHistory {
     double? consumptionRatio,
     String? logDate,
     bool? isInMenu,
+    String? cookingMethod,
     String? nutritionData,
     String? mainGroup,
     DateTime? createdAt,
@@ -140,6 +153,7 @@ class ScanHistory {
       consumptionRatio: consumptionRatio ?? this.consumptionRatio,
       logDate: logDate ?? this.logDate,
       isInMenu: isInMenu ?? this.isInMenu,
+      cookingMethod: cookingMethod ?? this.cookingMethod,
       nutritionData: nutritionData ?? this.nutritionData,
       mainGroup: mainGroup ?? this.mainGroup,
       createdAt: createdAt ?? this.createdAt,

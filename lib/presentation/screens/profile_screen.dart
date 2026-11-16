@@ -75,14 +75,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     }
   }
 
-  String _getActivityFactorText(double factor) {
-    if (factor <= 1.2) return 'Ít vận động - Làm việc văn phòng';
-    if (factor <= 1.375) return 'Vận động nhẹ - Tập 1-3 ngày/tuần';
-    if (factor <= 1.55) return 'Vận động vừa - Tập 3-5 ngày/tuần';
-    if (factor <= 1.725) return 'Vận động nhiều - Tập 6-7 ngày/tuần';
-    return 'Vận động rất nhiều - Tập nặng 2 lần/ngày';
-  }
-
   @override
   Widget build(BuildContext context) {
     final profileState = ref.watch(profileProvider);
@@ -291,10 +283,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
     final bool canEnableObesity = bmi >= 23.0;
     final bool isObesityOn = profile.isObesityMode;
-    final bool hasGoalWarning = canEnableObesity &&
-        !isObesityOn &&
-        ((bmi >= 25.0 && profile.goal != 'Giảm cân') ||
-         (bmi >= 23.0 && profile.goal == 'Tăng cân'));
+    final bool hasGoalWarning =
+        !isObesityOn && UserProfile.hasGoalConflictWithBmi(bmi, profile.goal);
 
     return Container(
       width: double.infinity,
@@ -356,7 +346,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                         style: TextStyle(fontWeight: FontWeight.w600),
                       ),
                       TextSpan(
-                        text: '${_getActivityFactorText(profile.activityFactor)} • Hệ số vận động: ${profile.activityFactor}',
+                        text: '${UserProfile.activityLabelForFactor(profile.activityFactor)} • Hệ số vận động: ${profile.activityFactor}',
                       ),
                     ],
                   ),
@@ -727,13 +717,12 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   Widget _buildMedicalCeilingsCard(UserProfile profile) {
     final List<String> conditions = profile.medicalConditions;
     final List<String> allergies = profile.allergies;
-    final flags = profile.medicalFlags;
-    final hasDiabetes = flags.isNotEmpty && flags[0] == '1';
-    final hasHypertension = flags.length > 1 && flags[1] == '1';
-    final hasLipid = flags.length > 2 && flags[2] == '1';
-    final hasGout = flags.length > 3 && flags[3] == '1';
-    final hasKidney = profile.ceilingProteinKidney > 0;
-    final hasCardio = flags.length > 5 && flags[5] == '1';
+    final hasDiabetes = profile.hasDiabetes;
+    final hasHypertension = profile.hasHypertension;
+    final hasLipid = profile.hasLipidDisorder;
+    final hasGout = profile.hasGout;
+    final hasKidney = profile.hasKidneyDisease;
+    final hasCardio = profile.hasCardioDisease;
 
     return Container(
       width: double.infinity,

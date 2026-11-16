@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/models/scan_history_model.dart';
+import '../../data/repositories/food_repository.dart';
 import '../../domain/usecases/nutrition_suggestion_usecase.dart';
 
 import '../state/scan_controller.dart';
@@ -82,10 +83,9 @@ class _FoundObjectScreenState extends ConsumerState<FoundObjectScreen> {
   double _eggEatenCount = 1.0;
   Timer? _syncDebounce;
 
-  String _formatDateYmd(DateTime dt) {
-    return '${dt.year.toString().padLeft(4, '0')}-${dt.month.toString().padLeft(2, '0')}-${dt.day.toString().padLeft(2, '0')}';
+  String _formatEggCount(double count) {
+    return count == count.roundToDouble() ? count.toInt().toString() : count.toString();
   }
-
 
   bool get _isEggFood {
     final name = _currentData.foodName.toLowerCase();
@@ -107,15 +107,12 @@ class _FoundObjectScreenState extends ConsumerState<FoundObjectScreen> {
     super.initState();
     _currentData = widget.resultData;
     _suggestionText = _currentData.aiSuggestion;
-    final todayStr = _formatDateYmd(DateTime.now());
-    final scanDate = _currentData.logDate ?? _formatDateYmd(_currentData.createdAt);
+    final todayStr = ScanHistory.formatDateYmd(DateTime.now());
+    final scanDate = _currentData.logDate ?? ScanHistory.formatDateYmd(_currentData.createdAt);
     _isAddedToMenu = _currentData.id != null && _currentData.isInMenu && scanDate == todayStr;
     if (_isEggFood) {
-      _eggEatenCount = _currentData.consumptionRatio;
-      if (_eggEatenCount <= 0) _eggEatenCount = 1.0;
-      _eggPortionController.text = _eggEatenCount == _eggEatenCount.roundToDouble()
-          ? _eggEatenCount.toInt().toString()
-          : _eggEatenCount.toString();
+      _eggEatenCount = _currentData.effectiveConsumptionRatio;
+      _eggPortionController.text = _formatEggCount(_eggEatenCount);
     }
 
     if (widget.isFromScan) {
@@ -183,22 +180,12 @@ class _FoundObjectScreenState extends ConsumerState<FoundObjectScreen> {
     double weight,
     double ratio,
   ) {
-    double p100 = 0, c100 = 0, f100 = 0;
-    for (var item in nutritionList) {
-      if (item['id'] == 'protein') p100 = (item['per_100g'] as num?)?.toDouble() ?? 0.0;
-      if (item['id'] == 'carb') c100 = (item['per_100g'] as num?)?.toDouble() ?? 0.0;
-      if (item['id'] == 'fat' || item['id'] == 'total_fat') {
-        f100 = (item['per_100g'] as num?)?.toDouble() ?? 0.0;
-      }
-    }
     final actualW = weight * (ratio > 0 ? ratio : 1.0);
-    return ref.read(foodRepositoryProvider).calculateServingUnit(
-      mainGroup: mainGroup,
-      p100: p100,
-      c100: c100,
-      f100: f100,
-      actualWeight: actualW,
-    ).servingCount;
+    return ref.read(foodRepositoryProvider).calculatePrimaryServingCount(
+      nutritionList,
+      mainGroup,
+      actualW,
+    );
   }
 
   void _onEggPortionChanged(String val) {
@@ -211,18 +198,14 @@ class _FoundObjectScreenState extends ConsumerState<FoundObjectScreen> {
 
   void _incrementEggPortion() {
     _eggEatenCount = _eggEatenCount + 0.5;
-    _eggPortionController.text = _eggEatenCount == _eggEatenCount.roundToDouble()
-        ? _eggEatenCount.toInt().toString()
-        : _eggEatenCount.toString();
+    _eggPortionController.text = _formatEggCount(_eggEatenCount);
     _setConsumptionRatio(_eggEatenCount, fromEggInput: true);
   }
 
   void _decrementEggPortion() {
     if (_eggEatenCount > 0.5) {
       _eggEatenCount = _eggEatenCount - 0.5;
-      _eggPortionController.text = _eggEatenCount == _eggEatenCount.roundToDouble()
-          ? _eggEatenCount.toInt().toString()
-          : _eggEatenCount.toString();
+      _eggPortionController.text = _formatEggCount(_eggEatenCount);
       _setConsumptionRatio(_eggEatenCount, fromEggInput: true);
     }
   }
@@ -230,7 +213,7 @@ class _FoundObjectScreenState extends ConsumerState<FoundObjectScreen> {
   Future<void> _handleAddToMenu() async {
     try {
       final now = DateTime.now();
-      final todayStr = _formatDateYmd(now);
+      final todayStr = ScanHistory.formatDateYmd(now);
       final bool nextInMenu = !_isAddedToMenu;
 
       final updatedData = _currentData.copyWith(
@@ -295,7 +278,11 @@ class _FoundObjectScreenState extends ConsumerState<FoundObjectScreen> {
       _suggestionError = null;
     });
 
-    var rawFoodData = ref.read(foodRepositoryProvider).resolveRowFromFoodName(_currentData.foodName);
+    var rawFoodData = ref.read(foodRepositoryProvider).resolveRowFromFoodName(
+      _currentData.foodName,
+      cookingMethod: _currentData.cookingMethod,
+      decodedNutrition: _currentData.decodedNutrition,
+    );
     if (rawFoodData == null) {
       final decoded = _currentData.decodedNutrition;
       final Map<String, dynamic> fallbackData = {};
@@ -304,7 +291,7 @@ class _FoundObjectScreenState extends ConsumerState<FoundObjectScreen> {
         final val = item['per_100g'] ?? item['per_label'] ?? 0;
         if (id == 'energy') fallbackData['Năng lượng'] = val;
         if (id == 'protein') fallbackData['Chất đạm'] = val;
-        if (id == 'fat') fallbackData['Chất béo (Fat)'] = val;
+        if (id == 'fat' || id == 'total_fat') fallbackData['Chất béo (Fat)'] = val;
         if (id == 'carb') fallbackData['Chất bột đường'] = val;
         if (id == 'fiber') fallbackData['Chất xơ'] = val;
       }
@@ -417,6 +404,7 @@ class _FoundObjectScreenState extends ConsumerState<FoundObjectScreen> {
 
     final updatedData = _currentData.copyWith(
       foodName: formattedName,
+      cookingMethod: foodData['cooking_method']?.toString().trim(),
       servingUnits: servingCount,
       nutritionData: jsonEncode(nutritionArray),
       mainGroup: mainGroup,
@@ -438,7 +426,11 @@ class _FoundObjectScreenState extends ConsumerState<FoundObjectScreen> {
     final List<String> parts = repo.getPartsForLabel(displayLabel);
     if (parts.length < 2) return;
 
-    final currentRow = repo.resolveRowFromFoodName(_currentData.foodName);
+    final currentRow = repo.resolveRowFromFoodName(
+      _currentData.foodName,
+      cookingMethod: _currentData.cookingMethod,
+      decodedNutrition: _currentData.decodedNutrition,
+    );
     final String currentPart = currentRow?['part_name']?.toString().trim() ?? '';
     String selectedPart = parts.contains(currentPart) ? currentPart : parts.first;
 
@@ -819,9 +811,7 @@ class _FoundObjectScreenState extends ConsumerState<FoundObjectScreen> {
       _currentData = saved;
       if (!fromEggInput && _isEggFood) {
         _eggEatenCount = newRatio;
-        _eggPortionController.text = _eggEatenCount == _eggEatenCount.roundToDouble()
-            ? _eggEatenCount.toInt().toString()
-            : _eggEatenCount.toString();
+        _eggPortionController.text = _formatEggCount(_eggEatenCount);
       }
     });
   }
@@ -990,7 +980,7 @@ class _FoundObjectScreenState extends ConsumerState<FoundObjectScreen> {
     );
 
     if (newWeightStr != null && newWeightStr.isNotEmpty) {
-      double? newWeight = double.tryParse(newWeightStr);
+      final double? newWeight = double.tryParse(newWeightStr.trim().replaceAll(',', '.'));
       if (newWeight != null && newWeight > 0) {
         List<dynamic> jsonArr = jsonDecode(_currentData.nutritionData);
         for (var item in jsonArr) {
@@ -1025,55 +1015,11 @@ class _FoundObjectScreenState extends ConsumerState<FoundObjectScreen> {
     }
   }
 
-  Widget _buildFoodImageWidget() {
-    final validFile = _currentData.foodImageFile;
-    final memoryBytes = validFile == null ? _currentData.foodImageBytes : null;
-
-    Widget imageContent;
-    if (validFile != null) {
-      imageContent = Image.file(validFile, height: 120, fit: BoxFit.cover);
-    } else if (memoryBytes != null) {
-      imageContent = Image.memory(memoryBytes, height: 120, fit: BoxFit.cover);
-    } else {
-      imageContent = Container(
-        height: 120,
-        color: Colors.grey.shade200,
-        child: const Center(child: Icon(Icons.fastfood, color: Colors.grey, size: 36)),
-      );
-    }
-
-    final tag = _currentData.croppedFoodImage.isNotEmpty 
-        ? _currentData.croppedFoodImage 
-        : 'food_img_${_currentData.id ?? _currentData.createdAt.millisecondsSinceEpoch}';
-
-    return GestureDetector(
-      onTap: () {
-        if (validFile != null || memoryBytes != null) {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => FullScreenImage(
-                imageFile: validFile,
-                imageBytes: memoryBytes,
-                heroTag: tag,
-              ),
-            ),
-          );
-        }
-      },
-      child: Hero(
-        tag: tag,
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(12),
-          child: imageContent,
-        ),
-      ),
-    );
-  }
-
-  Widget _buildLabelImageWidget() {
-    final validFile = _currentData.labelImageFile;
-    final memoryBytes = validFile == null ? _currentData.labelImageBytes : null;
+  Widget _buildPreviewImageTile({required bool isLabel}) {
+    final validFile = isLabel ? _currentData.labelImageFile : _currentData.foodImageFile;
+    final memoryBytes = validFile == null
+        ? (isLabel ? _currentData.labelImageBytes : _currentData.foodImageBytes)
+        : null;
 
     if (validFile == null && memoryBytes == null) {
       return ClipRRect(
@@ -1081,23 +1027,30 @@ class _FoundObjectScreenState extends ConsumerState<FoundObjectScreen> {
         child: Container(
           height: 120,
           color: Colors.grey.shade200,
-          child: const Center(child: Text('Không có nhãn', style: TextStyle(color: Colors.grey))),
+          child: Center(
+            child: isLabel
+                ? const Text('Không có nhãn', style: TextStyle(color: Colors.grey))
+                : const Icon(Icons.fastfood, color: Colors.grey, size: 36),
+          ),
         ),
       );
     }
 
-    Widget imageContent = validFile != null
+    final Widget imageContent = validFile != null
         ? Image.file(validFile, height: 120, fit: BoxFit.cover)
         : Image.memory(memoryBytes!, height: 120, fit: BoxFit.cover);
 
-    final tag = _currentData.croppedLabelImage ?? 'label_img_${_currentData.id ?? _currentData.createdAt.millisecondsSinceEpoch}';
+    final String fallbackId = '${_currentData.id ?? _currentData.createdAt.millisecondsSinceEpoch}';
+    final String tag = isLabel
+        ? (_currentData.croppedLabelImage ?? 'label_img_$fallbackId')
+        : (_currentData.croppedFoodImage.isNotEmpty ? _currentData.croppedFoodImage : 'food_img_$fallbackId');
 
     return GestureDetector(
       onTap: () {
         Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (context) => FullScreenImage(
+            builder: (_) => FullScreenImage(
               imageFile: validFile,
               imageBytes: memoryBytes,
               heroTag: tag,
@@ -1118,7 +1071,7 @@ class _FoundObjectScreenState extends ConsumerState<FoundObjectScreen> {
   @override
   Widget build(BuildContext context) {
     final nutritionList = _currentData.decodedNutrition;
-    final double cRatio = _currentData.consumptionRatio > 0 ? _currentData.consumptionRatio : 1.0;
+    final double cRatio = _currentData.effectiveConsumptionRatio;
     final double actualW = _currentData.actualWeight;
 
     Map<String, dynamic> energy = {'per_label': 0, 'unit': 'kcal'};
@@ -1127,43 +1080,39 @@ class _FoundObjectScreenState extends ConsumerState<FoundObjectScreen> {
     Map<String, dynamic> carb = {'per_label': 0, 'unit': 'g'};
     Map<String, dynamic> fiber = {'per_label': 0, 'unit': 'g'};
 
-    double p100 = 0, c100 = 0, f100 = 0;
     for (var item in nutritionList) {
       if (item['id'] == 'energy') energy = item;
-      if (item['id'] == 'protein') {
-        protein = item;
-        p100 = (item['per_100g'] as num?)?.toDouble() ?? 0.0;
-      }
-      if (item['id'] == 'fat' || item['id'] == 'total_fat') {
-        fat = item;
-        f100 = (item['per_100g'] as num?)?.toDouble() ?? 0.0;
-      }
-      if (item['id'] == 'carb') {
-        carb = item;
-        c100 = (item['per_100g'] as num?)?.toDouble() ?? 0.0;
-      }
+      if (item['id'] == 'protein') protein = item;
+      if (item['id'] == 'fat' || item['id'] == 'total_fat') fat = item;
+      if (item['id'] == 'carb') carb = item;
       if (item['id'] == 'fiber') fiber = item;
     }
+    final macros = FoodRepository.extractMacrosPer100g(nutritionList);
 
     final foodRepo = ref.read(foodRepositoryProvider);
     final String displayLabel = _isEggFood ? 'Trứng' : foodRepo.resolveDisplayLabel(_currentData.foodName);
     final List<String> availableParts = _isEggFood ? const [] : foodRepo.getPartsForLabel(displayLabel);
     final bool hasMultipleParts = !_isEggFood && availableParts.length >= 2;
-    final Map<String, dynamic>? currentCsvRow =
-        _isEggFood ? null : foodRepo.resolveRowFromFoodName(_currentData.foodName);
+    final Map<String, dynamic>? currentCsvRow = _isEggFood
+        ? null
+        : foodRepo.resolveRowFromFoodName(
+            _currentData.foodName,
+            cookingMethod: _currentData.cookingMethod,
+            decodedNutrition: _currentData.decodedNutrition,
+          );
     final String currentPartName = currentCsvRow?['part_name']?.toString().trim() ??
         (availableParts.isNotEmpty ? availableParts.first : '');
     final String currentCookingMethod =
         currentCsvRow?['cooking_method']?.toString().trim() ?? 'Tươi';
     final List<Map<String, dynamic>> cookingRows =
         _isEggFood ? const [] : foodRepo.getCookingRowsForPart(displayLabel, currentPartName);
-    final bool showCookingCard = !_isEggFood && cookingRows.length >= 2;
+    final bool showCookingCard = !_isEggFood && cookingRows.isNotEmpty;
 
     final servingUnits = foodRepo.calculateAllServingUnits(
       mainGroup: _currentData.mainGroup,
-      p100: p100,
-      c100: c100,
-      f100: f100,
+      p100: macros.protein,
+      c100: macros.carb,
+      f100: macros.fat,
       actualWeight: actualW,
     );
 
@@ -1200,12 +1149,12 @@ class _FoundObjectScreenState extends ConsumerState<FoundObjectScreen> {
                 children: [
                   Expanded(
                     flex: 2,
-                    child: _buildFoodImageWidget(),
+                    child: _buildPreviewImageTile(isLabel: false),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
                     flex: 1,
-                    child: _buildLabelImageWidget(),
+                    child: _buildPreviewImageTile(isLabel: true),
                   ),
                 ],
               ),
@@ -1230,7 +1179,7 @@ class _FoundObjectScreenState extends ConsumerState<FoundObjectScreen> {
                       children: [
                         Expanded(
                           child: Text(
-                            _currentData.foodName.isNotEmpty ? '${_currentData.foodName[0].toUpperCase()}${_currentData.foodName.substring(1)}' : '',
+                            _currentData.capitalizedFoodName,
                             style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Color(0xFF1B233A)),
                           ),
                         ),
@@ -1346,7 +1295,7 @@ class _FoundObjectScreenState extends ConsumerState<FoundObjectScreen> {
               ),
               const SizedBox(height: 12),
 
-              // 2.15. PHƯƠNG PHÁP CHẾ BIẾN (chỉ hiện khi phần đang chọn có >= 2 cách chế biến)
+              // 2.15. PHƯƠNG PHÁP CHẾ BIẾN (luôn hiển thị cho các món không phải trứng)
               if (showCookingCard && cookingRows.isNotEmpty) ...[
                 Container(
                   width: double.infinity,
@@ -1530,7 +1479,7 @@ class _FoundObjectScreenState extends ConsumerState<FoundObjectScreen> {
                       ),
                       const SizedBox(height: 6),
                       Text(
-                        'Ăn ${_eggEatenCount.toStringAsFixed(1).replaceAll('.0', '')} quả trứng (tương đương ${actualW.toStringAsFixed(0)}g)',
+                        'Ăn ${_formatEggCount(_eggEatenCount)} quả trứng (tương đương ${actualW.toStringAsFixed(0)}g)',
                         style: TextStyle(fontSize: 12, color: Colors.grey.shade700, fontWeight: FontWeight.w500),
                       ),
                     ] else ...[
@@ -1799,7 +1748,8 @@ class _FoundObjectScreenState extends ConsumerState<FoundObjectScreen> {
                     );
                   }
 
-                  final bool isOffline = suggestionStr.contains('📶');
+                  final bool isOffline = suggestionStr.contains('📶') ||
+                      suggestionStr == NutritionSuggestionUseCase.offlineMessage;
                   final bool hasVeto = suggestionStr.contains('⛔') || suggestionStr.contains('🚨');
                   final bool hasWarning = suggestionStr.contains('⚠️');
                   final Color borderColor = hasVeto 

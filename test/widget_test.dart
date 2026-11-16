@@ -1,30 +1,67 @@
-// This is a basic Flutter widget test.
-//
-// To perform an interaction with a widget in your test, use the WidgetTester
-// utility in the flutter_test package. For example, you can send tap and scroll
-// gestures. You can also use WidgetTester to find child widgets in the widget
-// tree, read text, and verify that the values of widget properties are correct.
-
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-
-import 'package:nckh_app/main.dart';
+import 'package:nckh_app/data/models/scan_history_model.dart';
+import 'package:nckh_app/data/models/user_profile_model.dart';
+import 'package:nckh_app/data/repositories/food_repository.dart';
 
 void main() {
-  testWidgets('Counter increments smoke test', (WidgetTester tester) async {
-    // Build our app and trigger a frame.
-    await tester.pumpWidget(const MyApp());
+  TestWidgetsFlutterBinding.ensureInitialized();
 
-    // Verify that our counter starts at 0.
-    expect(find.text('0'), findsOneWidget);
-    expect(find.text('1'), findsNothing);
+  test('UserProfile encodes conditions and calculates BMI/ceilings correctly', () {
+    final profile = UserProfile.create(
+      dob: '01/01/2000',
+      weight: 80,
+      height: 170,
+      gender: 'Nam',
+      activityFactor: 1.55,
+      goal: 'Giữ dáng',
+      medicalConditions: ['Tiểu đường', 'Bệnh Thận'],
+      isObesityMode: true,
+    );
 
-    // Tap the '+' icon and trigger a frame.
-    await tester.tap(find.byIcon(Icons.add));
-    await tester.pump();
+    expect(profile.hasDiabetes, isTrue);
+    expect(profile.hasKidneyDisease, isTrue);
+    expect(profile.hasHypertension, isFalse);
+    expect(profile.isObesityMode, isTrue);
+    expect(profile.goal, 'Giảm cân');
+    expect(profile.budgetProtein, closeTo(64.0, 0.01));
+    expect(UserProfile.calculateBmi(80, 170), closeTo(27.68, 0.05));
+  });
 
-    // Verify that our counter has incremented.
-    expect(find.text('0'), findsNothing);
-    expect(find.text('1'), findsOneWidget);
+  test('ScanHistory formats weight, date and effective consumption ratio', () {
+    final scan = ScanHistory(
+      originalImage: '',
+      croppedFoodImage: '',
+      foodName: 'thịt gà - Ức gà công nghiệp',
+      weight: 200,
+      consumptionRatio: 0.5,
+      cookingMethod: 'Luộc',
+      nutritionData: '[]',
+      mainGroup: 'Chất đạm',
+      createdAt: DateTime(2026, 11, 16, 12, 30),
+    );
+
+    expect(scan.actualWeight, 100.0);
+    expect(scan.capitalizedFoodName, 'Thịt gà - Ức gà công nghiệp');
+    expect(ScanHistory.formatDateYmd(scan.createdAt), '2026-11-16');
+    expect(scan.formatWeight(), '200 g');
+  });
+
+  test('FoodRepository loads nutrition.csv and resolves display names without parentheses', () async {
+    final repo = FoodRepository();
+    await repo.loadCsvData();
+
+    final chicken = repo.findFoodByName('Thịt gà');
+    expect(chicken, isNotNull);
+    final displayName = repo.formatDisplayName(chicken!);
+    expect(displayName.contains('('), isFalse);
+
+    final parts = repo.getPartsForLabel('Thịt gà');
+    expect(parts.length, greaterThanOrEqualTo(2));
+
+    final octopus = repo.findFoodByName('Bạch tuộc');
+    expect(octopus, isNotNull);
+
+    final mushroom = repo.findFoodByName('Nấm đùi gà');
+    expect(mushroom, isNotNull);
   });
 }

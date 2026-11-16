@@ -162,7 +162,7 @@ class SyncController extends Notifier<AuthUserState> {
       }
     } catch (e) {
       String msg = 'Lỗi đăng nhập: $e';
-      if (e.toString().contains('ApiException: 10') || e.toString().contains('10')) {
+      if (e.toString().contains('ApiException: 10')) {
         msg = 'Lỗi ApiException 10: Cần thêm SHA-1 và Package name (com.example.nckh_app) trên Google Cloud Console.';
       }
       state = state.copyWith(isSyncing: false, syncMessage: msg);
@@ -183,7 +183,6 @@ class SyncController extends Notifier<AuthUserState> {
     await ApiService.instance.clearAuthToken();
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove('cached_user_profile');
-    await prefs.remove('jwt_access_token');
 
     // Xóa sạch CSDL SQLite trên máy
     await DatabaseHelper.instance.clearAllLocalData();
@@ -251,6 +250,7 @@ class SyncController extends Notifier<AuthUserState> {
           'consumptionRatio': s.consumptionRatio,
           'logDate': s.logDate,
           'isInMenu': s.isInMenu,
+          'cookingMethod': s.cookingMethod,
           'nutritionData': s.decodedNutrition,
           'mainGroup': s.mainGroup,
           'originalImageBase64': origBase64,
@@ -382,6 +382,7 @@ class SyncController extends Notifier<AuthUserState> {
                       s['is_in_menu'] == 1 ||
                       s['isInMenu'] == true ||
                       s['isInMenu'] == 1),
+              cookingMethod: s['cooking_method'] ?? s['cookingMethod'],
               nutritionData: s['nutrition_data'] is String 
                   ? s['nutrition_data'] 
                   : jsonEncode(s['nutrition_data'] ?? []),

@@ -21,25 +21,23 @@ class LoginScreen extends ConsumerWidget {
               children: [
                 // 1. Logo / Icon thương hiệu
                 Container(
-                  width: 100,
-                  height: 100,
+                  width: 116,
+                  height: 116,
                   decoration: BoxDecoration(
-                    color: Colors.green.shade50,
-                    shape: BoxShape.circle,
-                    border: Border.all(color: Colors.green.shade200, width: 2),
+                    borderRadius: BorderRadius.circular(26),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.green.withValues(alpha: 0.15),
-                        blurRadius: 16,
+                        color: Colors.green.withValues(alpha: 0.16),
+                        blurRadius: 18,
                         offset: const Offset(0, 6),
                       ),
                     ],
                   ),
-                  child: const Center(
-                    child: Icon(
-                      Icons.health_and_safety_rounded,
-                      size: 52,
-                      color: Colors.green,
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(26),
+                    child: Image.asset(
+                      'assets/images/logo.png',
+                      fit: BoxFit.cover,
                     ),
                   ),
                 ),
@@ -67,7 +65,7 @@ class LoginScreen extends ConsumerWidget {
                 ),
                 const SizedBox(height: 36),
 
-                // 4. Thông báo lỗi hoặc tiến trình
+                // 3. Thông báo lỗi hoặc tiến trình
                 if (syncState.syncMessage != null && syncState.syncMessage!.isNotEmpty) ...[
                   Container(
                     width: double.infinity,
@@ -98,7 +96,7 @@ class LoginScreen extends ConsumerWidget {
                   ),
                 ],
 
-                // 5. Nút bấm Đăng nhập với Google
+                // 4. Nút bấm Đăng nhập với Google
                 SizedBox(
                   width: double.infinity,
                   height: 52,
@@ -165,7 +163,7 @@ class LoginScreen extends ConsumerWidget {
                 ),
                 const SizedBox(height: 20),
 
-                // 6. Ghi chú bảo mật
+                // 5. Ghi chú bảo mật
                 Text(
                   'Đăng nhập giúp đồng bộ bảo mật hồ sơ và lịch sử tra cứu của bạn trên mọi thiết bị.',
                   textAlign: TextAlign.center,

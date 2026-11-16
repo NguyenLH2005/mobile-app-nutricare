@@ -11,6 +11,7 @@ class ResultScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final nutritionList = resultData.decodedNutrition;
     final timeString = DateFormat('HH:mm dd/MM/yyyy').format(resultData.createdAt);
+    final double ratio = resultData.effectiveConsumptionRatio;
 
     return Scaffold(
       backgroundColor: Colors.grey.shade100,
@@ -166,7 +167,7 @@ class ResultScreen extends StatelessWidget {
                             Expanded(
                               flex: 1,
                               child: Text(
-                                '${(((item['per_label'] as num?)?.toDouble() ?? 0.0) * (resultData.consumptionRatio > 0 ? resultData.consumptionRatio : 1.0)).toStringAsFixed(1)} ${item['unit']}',
+                                '${(((item['per_label'] as num?)?.toDouble() ?? 0.0) * ratio).toStringAsFixed(1)} ${item['unit']}',
                                 textAlign: TextAlign.right,
                                 style: const TextStyle(
                                   fontSize: 16,

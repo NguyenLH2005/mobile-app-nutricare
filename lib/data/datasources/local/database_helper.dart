@@ -21,7 +21,7 @@ class DatabaseHelper {
 
     return await openDatabase(
       path,
-      version: 12,
+      version: 13,
       onCreate: _createDB,
       onUpgrade: (db, oldVersion, newVersion) async {
         if (oldVersion < 8) {
@@ -66,6 +66,11 @@ class DatabaseHelper {
             await db.execute("ALTER TABLE scan_history ADD COLUMN is_in_menu INTEGER NOT NULL DEFAULT 1");
           } catch (_) {}
         }
+        if (oldVersion < 13) {
+          try {
+            await db.execute("ALTER TABLE scan_history ADD COLUMN cooking_method TEXT");
+          } catch (_) {}
+        }
       },
     );
   }
@@ -87,6 +92,7 @@ class DatabaseHelper {
       consumption_ratio REAL NOT NULL DEFAULT 1.0,
       log_date TEXT,
       is_in_menu INTEGER NOT NULL DEFAULT 0,
+      cooking_method TEXT,
       nutrition_data TEXT NOT NULL,
       main_group TEXT NOT NULL,
       created_at TEXT NOT NULL,

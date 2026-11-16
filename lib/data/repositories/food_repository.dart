@@ -3,43 +3,41 @@ import 'package:flutter/services.dart';
 import 'package:csv/csv.dart';
 
 class FoodRepository {
-  // Biến lưu trữ dữ liệu CSV trên RAM dạng Map để tra cứu
-  // Key: tên món ăn đã chuẩn hóa, Value: dữ liệu 1 dòng của món đó
-  final Map<String, List<dynamic>> _foodData = {};
+  // Biến lưu trữ dữ liệu CSV trên RAM để tra cứu nhanh
   final List<Map<String, dynamic>> _allRows = [];
+  final Map<String, Map<String, dynamic>> _rowsByCode = {};
   final Map<String, List<Map<String, dynamic>>> _rowsByLabel = {};
-  List<String> _headers = [];
 
   // Hàm đọc file CSV (chỉ gọi 1 lần khi khởi động app)
   Future<void> loadCsvData() async {
     try {
       final rawData = await rootBundle.loadString(
-        'assets/db/gia_tri_dinh_duong_thuc_pham_chi_tiet.csv',
+        'assets/db/nutrition.csv',
       );
-      
-      List<List<dynamic>> rowsAsListOfValues = Csv().decode(rawData);
 
-      _foodData.clear();
+      final List<List<dynamic>> rowsAsListOfValues = Csv().decode(rawData);
+
       _allRows.clear();
+      _rowsByCode.clear();
       _rowsByLabel.clear();
 
       if (rowsAsListOfValues.isNotEmpty) {
-        _headers = rowsAsListOfValues.first.map((e) => e.toString().trim()).toList(); // Lấy dòng đầu làm tiêu đề
+        final headers = rowsAsListOfValues.first.map((e) => e.toString().trim()).toList();
 
         for (int i = 1; i < rowsAsListOfValues.length; i++) {
           final row = rowsAsListOfValues[i];
-          if (row.length > 1) {
-            final String rawName = row[1].toString();
-            final String normalizedName = _normalizeString(rawName);
-            _foodData[normalizedName] = row;
+          if (row.length == headers.length) {
+            final rowMap = Map<String, dynamic>.fromIterables(headers, row);
+            _allRows.add(rowMap);
 
-            if (row.length == _headers.length) {
-              final rowMap = Map<String, dynamic>.fromIterables(_headers, row);
-              _allRows.add(rowMap);
-              final labelKey = _normalizeString(rowMap['food_label']?.toString() ?? '');
-              if (labelKey.isNotEmpty) {
-                _rowsByLabel.putIfAbsent(labelKey, () => []).add(rowMap);
-              }
+            final codeKey = _normalizeString(rowMap['code']?.toString() ?? '');
+            if (codeKey.isNotEmpty) {
+              _rowsByCode[codeKey] = rowMap;
+            }
+
+            final labelKey = _normalizeString(rowMap['food_label']?.toString() ?? '');
+            if (labelKey.isNotEmpty) {
+              _rowsByLabel.putIfAbsent(labelKey, () => []).add(rowMap);
             }
           }
         }
@@ -49,63 +47,63 @@ class FoodRepository {
     }
   }
 
-  // Bản đồ ánh xạ: Tên nhận diện từ AI -> Tên danh mục chuẩn trong file CSV
+  // Bản đồ ánh xạ: Tên nhận diện từ AI -> Mã code chuẩn trong nutrition.csv
   static const Map<String, String> csvNameMapper = {
-    'Bạch tuộc': 'mực, tươi',
-    'Bắp cải': 'cải bắp trắng, tươi',
-    'Bầu': 'quả bầu, tươi',
-    'Bí đỏ': 'quả bí ngô, tươi',
-    'Bơ': 'quả bơ vỏ xanh, tươi',
-    'Cà chua': 'quả cà chua, tươi',
-    'Cá điêu hồng': 'cá điêu hồng',
-    'Cá hồi': 'cá hồi, tươi',
-    'Cá lóc': 'cá quả, tươi',
-    'Cá ngừ': 'cá ngừ, tươi',
-    'Cà rốt': 'củ cà rốt, tươi',
-    'Cá thu': 'cá thu, tươi',
-    'Cải xanh': 'cải xanh, tươi',
-    'Cam': 'cam, tươi',
-    'Chôm chôm': 'chôm chôm, tươi',
-    'Chuối': 'chuối tiêu, tươi',
-    'Cua': 'Thịt cua',
-    'Dâu tây': 'dâu tây, tươi',
-    'Đu đủ': 'đu đủ chín, tươi',
-    'Dưa hấu': 'dưa hấu, tươi',
-    'Dưa leo': 'dưa chuột, tươi',
-    'Ếch': 'ếch (thịt đùi), tươi',
-    'Hạnh nhân': 'hạt hạnh nhân rang',
-    'Khổ qua': 'mướp đắng, tươi',
-    'Khoai lang': 'khoai lang, tươi',
-    'Khoai tây': 'khoai tây, tươi',
-    'Khóm': 'Dứa ta, tươi',
-    'Lê': 'lê, tươi',
-    'Mực': 'mực, tươi',
-    'Nấm đùi gà': 'nấm thường, tươi',
-    'Nấm kim châm': 'nấm kim châm',
-    'Nấm rơm': 'nấm rơm, tươi',
-    'Ngô': 'ngô, cả bắp, tươi',
-    'Nho': 'nho ngọt, tươi',
-    'Óc chó': 'hạt óc chó rang',
-    'Ổi': 'ổi, quả chín, tươi',
-    'Ớt chuông': 'ớt đỏ to, tươi',
-    'Rau muống': 'rau muống, tươi',
-    'Sầu riêng': 'sầu riêng, tươi',
-    'Súp lơ': 'súp lơ xanh, tươi',
-    'Táo': 'táo tây, tươi',
-    'Thanh long': 'quả thanh long, tươi',
-    'Thịt bò': 'thịt bò, lưng, nạc, tươi',
-    'Thịt gà': 'thịt gà công nghiệp, lườn, raw',
-    'Thịt heo': 'thịt lợn, nạc, tươi',
-    'Thịt vịt': 'Thịt vịt, tươi',
-    'Tôm': 'tôm biển, tươi',
-    'Trứng': 'Trứng gà công nghiệp',
-    'Trứng gà': 'Trứng gà công nghiệp',
-    'Trứng gà (công nghiệp)': 'Trứng gà công nghiệp',
-    'Trứng gà ta': 'Trứng gà ta',
-    'Trứng vịt': 'Trứng vịt',
-    'Trứng vịt lộn': 'Trứng vịt lộn',
-    'Vải': 'vải, tươi',
-    'Xoài': 'xoài chín, tươi',
+    'Bạch tuộc': 'BACH_TUOC',
+    'Bắp cải': '4010',
+    'Bầu': '4001',
+    'Bí đỏ': '4003',
+    'Bơ': '5042',
+    'Cà chua': '4005',
+    'Cá điêu hồng': '8062',
+    'Cá hồi': '8011',
+    'Cá lóc': '8022',
+    'Cá ngừ': '8019',
+    'Cà rốt': '4007',
+    'Cá thu': '8026',
+    'Cải xanh': '4016',
+    'Cam': '5002',
+    'Chôm chôm': '5004',
+    'Chuối': '5007',
+    'Cua': '8069',
+    'Dâu tây': '5009',
+    'Đu đủ': '5017',
+    'Dưa hấu': '5011',
+    'Dưa leo': '4027',
+    'Ếch': '7080',
+    'Hạnh nhân': '3042011',
+    'Khổ qua': '4055',
+    'Khoai lang': '2008',
+    'Khoai tây': '2014',
+    'Khóm': '5014',
+    'Lê': '5023',
+    'Mực': '8040',
+    'Nấm đùi gà': 'NAM_DUI_GA',
+    'Nấm kim châm': '4133',
+    'Nấm rơm': '4129',
+    'Ngô': '1007',
+    'Nho': '5037',
+    'Óc chó': '3043011',
+    'Ổi': '5040',
+    'Ớt chuông': '4061',
+    'Rau muống': '4083',
+    'Sầu riêng': '5048',
+    'Súp lơ': '4100',
+    'Táo': '5051',
+    'Thanh long': '5044',
+    'Thịt bò': '7005',
+    'Thịt gà': '7089',
+    'Thịt heo': '7017',
+    'Thịt vịt': '7028',
+    'Tôm': '8051',
+    'Trứng': '9012',
+    'Trứng gà': '9012',
+    'Trứng gà (công nghiệp)': '9012',
+    'Trứng gà ta': '9001',
+    'Trứng vịt': '9004',
+    'Trứng vịt lộn': '9010',
+    'Vải': '5052',
+    'Xoài': '5055',
   };
 
   // Hàm chuẩn hóa chuỗi (chữ thường, bỏ khoảng trắng thừa)
@@ -113,43 +111,47 @@ class FoodRepository {
     return input.trim().toLowerCase().replaceAll(RegExp(r'\s+'), ' ');
   }
 
-  // Hàm tra cứu gần đúng (Substring matching), ưu tiên tên ngắn nhất
+  /// Tra cứu dòng CSV từ code, tên nhãn, tên phần (Trứng...), hoặc tên hiển thị.
   Map<String, dynamic>? findFoodByName(String name) {
-    final mappedName = csvNameMapper[name] ?? name;
-    final searchName = _normalizeString(mappedName);
-    
-    String? bestMatchKey;
-    
-    for (String key in _foodData.keys) {
-      if (key.contains(searchName)) {
-        if (bestMatchKey == null || key.length < bestMatchKey.length) {
-          bestMatchKey = key;
-        }
+    final norm = _normalizeString(name);
+    if (norm.isEmpty) return null;
+
+    // 1. Kiểm tra ánh xạ trực tiếp từ nhãn AI -> code
+    for (final entry in csvNameMapper.entries) {
+      if (_normalizeString(entry.key) == norm) {
+        final byCode = _rowsByCode[_normalizeString(entry.value)];
+        if (byCode != null) return byCode;
       }
     }
 
-    if (bestMatchKey != null) {
-      final rowData = _foodData[bestMatchKey]!;
-      // Ghép Header với Dữ liệu thành một Map cho dễ lấy
-      return Map.fromIterables(_headers, rowData);
+    // 2. Tra cứu trực tiếp theo mã code
+    final byCode = _rowsByCode[norm];
+    if (byCode != null) return byCode;
+
+    // 3. Khớp theo tên hiển thị định dạng hoặc part_name (như 4 loại Trứng)
+    for (final row in _allRows) {
+      if (_normalizeString(formatDisplayName(row)) == norm) return row;
+      final partNorm = _normalizeString(row['part_name']?.toString() ?? '');
+      if (partNorm.isNotEmpty && partNorm == norm) return row;
     }
 
-    // Dự phòng: nếu mappedName khác name mà không tìm ra, thử tìm theo name gốc
-    if (mappedName != name) {
-      final rawSearchName = _normalizeString(name);
-      for (String key in _foodData.keys) {
-        if (key.contains(rawSearchName)) {
-          if (bestMatchKey == null || key.length < bestMatchKey.length) {
-            bestMatchKey = key;
-          }
-        }
-      }
-      if (bestMatchKey != null) {
-        final rowData = _foodData[bestMatchKey]!;
-        return Map.fromIterables(_headers, rowData);
+    // 4. Khớp theo food_label (ưu tiên Tươi/Nguyên bản nếu có)
+    final labelRows = _rowsByLabel[norm];
+    if (labelRows != null && labelRows.isNotEmpty) {
+      return labelRows.first;
+    }
+
+    // 5. Dự phòng: khớp tiền tố food_label cho dữ liệu lịch sử cũ
+    String? bestPrefixLabel;
+    for (final key in _rowsByLabel.keys) {
+      if (norm.startsWith(key) && (bestPrefixLabel == null || key.length > bestPrefixLabel.length)) {
+        bestPrefixLabel = key;
       }
     }
-    
+    if (bestPrefixLabel != null) {
+      return findFoodByName(bestPrefixLabel);
+    }
+
     return null;
   }
 
@@ -233,6 +235,17 @@ class FoodRepository {
     return nutritionArray;
   }
 
+  static ({double protein, double carb, double fat}) extractMacrosPer100g(List<dynamic> nutritionList) {
+    double p100 = 0, c100 = 0, f100 = 0;
+    for (final item in nutritionList) {
+      final id = item['id'];
+      if (id == 'protein') p100 = (item['per_100g'] as num?)?.toDouble() ?? 0.0;
+      if (id == 'carb') c100 = (item['per_100g'] as num?)?.toDouble() ?? 0.0;
+      if (id == 'fat' || id == 'total_fat') f100 = (item['per_100g'] as num?)?.toDouble() ?? 0.0;
+    }
+    return (protein: p100, carb: c100, fat: f100);
+  }
+
   List<ServingUnitInfo> calculateAllServingUnits({
     required String mainGroup,
     required double p100,
@@ -243,90 +256,50 @@ class FoodRepository {
     final List<ServingUnitInfo> results = [];
     final groupLower = mainGroup.toLowerCase();
 
+    void addStandardUnit(double servingWeight, String shortName) {
+      results.add(ServingUnitInfo(
+        servingWeight: servingWeight,
+        servingCount: actualWeight / servingWeight,
+        groupShortName: shortName,
+      ));
+    }
+
     // 1. Nhóm đạm: 1 phần chuẩn cung cấp 7g Protein (Công thức 2.7)
     if (p100 >= 3.0 || groupLower.contains('đạm') || groupLower.contains('protein') || groupLower.contains('thịt') || groupLower.contains('cá') || groupLower.contains('trứng') || groupLower.contains('hải sản')) {
-      if (p100 > 0) {
-        final double mServing = 700.0 / p100;
-        final double count = actualWeight / mServing;
-        results.add(ServingUnitInfo(
-          servingWeight: mServing,
-          servingCount: count,
-          groupName: 'Chất đạm',
-          groupShortName: 'đạm',
-          standardNutrient: '7g đạm',
-          standardDesc: '1 phần chuẩn = ${mServing.toStringAsFixed(0)}g • 7g Đạm',
-          summaryText: '≈ ${count.toStringAsFixed(1)} phần đạm chuẩn • 1 phần = 7g đạm = ${mServing.toStringAsFixed(0)}g',
-        ));
-      }
+      if (p100 > 0) addStandardUnit(700.0 / p100, 'đạm');
     }
 
     // 2. Nhóm tinh bột / bột đường: 1 phần chuẩn cung cấp 20g Carbohydrate (Công thức 2.8)
     if (c100 >= 5.0 || groupLower.contains('đường') || groupLower.contains('bột') || groupLower.contains('carb') || groupLower.contains('khoai') || groupLower.contains('ngô') || groupLower.contains('trái cây') || groupLower.contains('chuối')) {
-      if (c100 > 0) {
-        final double mServing = 2000.0 / c100;
-        final double count = actualWeight / mServing;
-        results.add(ServingUnitInfo(
-          servingWeight: mServing,
-          servingCount: count,
-          groupName: 'Chất bột đường',
-          groupShortName: 'tinh bột',
-          standardNutrient: '20g tinh bột',
-          standardDesc: '1 phần chuẩn = ${mServing.toStringAsFixed(0)}g • 20g Tinh bột',
-          summaryText: '≈ ${count.toStringAsFixed(1)} phần tinh bột chuẩn • 1 phần = 20g tinh bột = ${mServing.toStringAsFixed(0)}g',
-        ));
-      }
+      if (c100 > 0) addStandardUnit(2000.0 / c100, 'tinh bột');
     }
 
     // 3. Nhóm chất béo: 1 phần chuẩn cung cấp 5g Lipid (Công thức 2.9)
     if (f100 >= 3.0 || groupLower.contains('béo') || groupLower.contains('fat') || groupLower.contains('lipid') || groupLower.contains('hạt') || groupLower.contains('dầu') || groupLower.contains('trứng')) {
-      if (f100 > 0) {
-        final double mServing = 500.0 / f100;
-        final double count = actualWeight / mServing;
-        results.add(ServingUnitInfo(
-          servingWeight: mServing,
-          servingCount: count,
-          groupName: 'Chất béo',
-          groupShortName: 'béo',
-          standardNutrient: '5g chất béo',
-          standardDesc: '1 phần chuẩn = ${mServing.toStringAsFixed(0)}g • 5g Chất béo',
-          summaryText: '≈ ${count.toStringAsFixed(1)} phần béo chuẩn • 1 phần = 5g chất béo = ${mServing.toStringAsFixed(0)}g',
-        ));
-      }
+      if (f100 > 0) addStandardUnit(500.0 / f100, 'béo');
     }
 
     // 4. Mặc định nếu không có nhóm đa lượng nào ở trên: quy chuẩn rau củ 80g
     if (results.isEmpty) {
-      final double mServing = 80.0;
-      final double count = actualWeight / mServing;
-      results.add(ServingUnitInfo(
-        servingWeight: mServing,
-        servingCount: count,
-        groupName: 'Rau củ quả',
-        groupShortName: 'rau củ',
-        standardNutrient: '80g rau củ',
-        standardDesc: '1 phần chuẩn = 80g',
-        summaryText: '≈ ${count.toStringAsFixed(1)} phần rau củ chuẩn • 1 phần = 80g',
-      ));
+      addStandardUnit(80.0, 'rau củ');
     }
 
     return results;
   }
 
-  ServingUnitInfo calculateServingUnit({
-    required String mainGroup,
-    required double p100,
-    required double c100,
-    required double f100,
-    required double actualWeight,
-  }) {
-    final list = calculateAllServingUnits(
+  double calculatePrimaryServingCount(
+    List<dynamic> nutritionList,
+    String mainGroup,
+    double actualWeight,
+  ) {
+    final macros = extractMacrosPer100g(nutritionList);
+    return calculateAllServingUnits(
       mainGroup: mainGroup,
-      p100: p100,
-      c100: c100,
-      f100: f100,
+      p100: macros.protein,
+      c100: macros.carb,
+      f100: macros.fat,
       actualWeight: actualWeight,
-    );
-    return list.first;
+    ).first.servingCount;
   }
 
   // =========================================================================
@@ -335,7 +308,6 @@ class FoodRepository {
 
   String _mapToCsvLabel(String displayLabel) {
     final norm = _normalizeString(displayLabel);
-    if (norm == 'bạch tuộc') return 'Mực';
     if (norm.startsWith('trứng')) return 'Trứng';
     return displayLabel.trim();
   }
@@ -348,7 +320,6 @@ class FoodRepository {
   /// Xác định nhãn gốc (50 món AI) từ tên hiển thị trong ScanHistory (hỗ trợ cả dữ liệu cũ và định dạng mới).
   String resolveDisplayLabel(String foodName) {
     final norm = _normalizeString(foodName);
-    if (norm.startsWith('bạch tuộc')) return 'Bạch tuộc';
 
     final matchedRow = resolveRowFromFoodName(foodName);
     final csvLabel = matchedRow?['food_label']?.toString().trim() ?? '';
@@ -367,33 +338,68 @@ class FoodRepository {
     return bestKey ?? foodName.trim();
   }
 
-  /// Tra cứu dòng CSV chính xác tương ứng với tên món lưu trong ScanHistory.
-  Map<String, dynamic>? resolveRowFromFoodName(String foodName) {
+  /// Tra cứu dòng CSV chính xác tương ứng với bản ghi ScanHistory (không cần gắn ngoặc chế biến vào tên).
+  Map<String, dynamic>? resolveRowFromFoodName(
+    String foodName, {
+    String? cookingMethod,
+    List<dynamic>? decodedNutrition,
+  }) {
     final norm = _normalizeString(foodName);
     if (norm.isEmpty) return null;
 
-    // 1. Khớp định dạng hiển thị "Nhãn - Phần (Chế biến)" hoặc "Nhãn (Chế biến)"
-    final bool isOctopus = norm.startsWith('bạch tuộc');
+    // Strip bất kỳ hậu tố "(Chế biến)" cũ nào từ lịch sử trước đây
+    final strippedNorm = norm.replaceAll(RegExp(r'\s*\([^)]*\)$'), '').trim();
+    final cookNorm = cookingMethod != null ? _normalizeString(cookingMethod) : '';
+
+    // Tập ứng viên khớp theo tên hiển thị mới hoặc part_name
+    final candidates = <Map<String, dynamic>>[];
     for (final row in _allRows) {
-      final override = isOctopus && _normalizeString(row['food_label']?.toString() ?? '') == 'mực'
-          ? 'Bạch tuộc'
-          : null;
-      final formatted = _normalizeString(formatDisplayName(row, overrideLabel: override));
-      if (formatted == norm) return row;
-
-      final rawName = _normalizeString(row['name_vi']?.toString() ?? '');
-      if (rawName == norm) return row;
-    }
-
-    // 2. Khớp theo tên nhãn gốc trong csvNameMapper (ví dụ: "Thịt bò", "Bầu"...)
-    for (final entry in csvNameMapper.entries) {
-      if (_normalizeString(entry.key) == norm) {
-        return findFoodByName(entry.value);
+      final displayNorm = _normalizeString(formatDisplayName(row));
+      final cook = row['cooking_method']?.toString().trim() ?? '';
+      final oldParen = cook.isNotEmpty ? _normalizeString('$displayNorm ($cook)') : displayNorm;
+      if (displayNorm == norm || displayNorm == strippedNorm || oldParen == norm) {
+        candidates.add(row);
       }
     }
 
-    // 3. Fallback tìm gần đúng như cũ
-    return findFoodByName(foodName);
+    if (candidates.isNotEmpty) {
+      if (cookNorm.isNotEmpty) {
+        for (final row in candidates) {
+          if (_normalizeString(row['cooking_method']?.toString() ?? '') == cookNorm) {
+            return row;
+          }
+        }
+      }
+
+      // Nếu chưa có cookingMethod (bản ghi cũ), so khớp energy per_100g trong decodedNutrition
+      if (decodedNutrition != null && decodedNutrition.isNotEmpty) {
+        double? e100;
+        for (final item in decodedNutrition) {
+          if (item['id'] == 'energy') {
+            e100 = (item['per_100g'] as num?)?.toDouble();
+            break;
+          }
+        }
+        if (e100 != null) {
+          for (final row in candidates) {
+            final rowE = double.tryParse(row['Năng lượng']?.toString() ?? '');
+            if (rowE != null && (rowE - e100).abs() < 0.6) {
+              return row;
+            }
+          }
+        }
+      }
+
+      // Ưu tiên "Tươi" nếu có nhiều lựa chọn
+      for (final row in candidates) {
+        final c = _normalizeString(row['cooking_method']?.toString() ?? '');
+        if (c == 'tươi' || c == 'sống') return row;
+      }
+      return candidates.first;
+    }
+
+    // Fallback theo code, nhãn gốc, part_name hoặc tiền tố food_label
+    return findFoodByName(strippedNorm.isNotEmpty ? strippedNorm : foodName);
   }
 
   /// Danh sách các phần/biến thể của một nhãn thực phẩm (đưa phần mặc định lên đầu tiên).
@@ -453,22 +459,10 @@ class FoodRepository {
     return options.isNotEmpty ? options.first : null;
   }
 
-  /// Kiểm tra xem cả nhóm món có nhiều hơn 1 phương pháp chế biến khác nhau không.
-  bool hasAnyCookingVariation(String displayLabel) {
-    final rows = _rowsForDisplayLabel(displayLabel);
-    final methods = <String>{};
-    for (final r in rows) {
-      final m = r['cooking_method']?.toString().trim() ?? '';
-      if (m.isNotEmpty) methods.add(m);
-    }
-    return methods.length >= 2;
-  }
-
-  /// Định dạng tên hiển thị chuẩn cho món ăn theo phần & phương pháp chế biến.
+  /// Định dạng tên hiển thị chuẩn cho món ăn (gọn gàng, không mở ngoặc cách chế biến).
   String formatDisplayName(Map<String, dynamic> row, {String? overrideLabel}) {
     final csvLabel = row['food_label']?.toString().trim() ?? '';
     final part = row['part_name']?.toString().trim() ?? '';
-    final cook = row['cooking_method']?.toString().trim() ?? '';
 
     if (csvLabel == 'Trứng' && part.isNotEmpty) {
       return part;
@@ -476,16 +470,15 @@ class FoodRepository {
 
     final label = (overrideLabel != null && overrideLabel.trim().isNotEmpty)
         ? overrideLabel.trim()
-        : (csvLabel.isNotEmpty ? csvLabel : (row['name_vi']?.toString().trim() ?? 'Món ăn'));
+        : (csvLabel.isNotEmpty ? csvLabel : (row['code']?.toString().trim() ?? 'Món ăn'));
 
     if (part.isNotEmpty) {
-      return cook.isNotEmpty ? '$label - $part ($cook)' : '$label - $part';
+      if (_normalizeString(part).startsWith(_normalizeString(label))) {
+        return part;
+      }
+      return '$label - $part';
     }
 
-    final cookOptions = getCookingRowsForPart(label, '');
-    if (cookOptions.length > 1 && cook.isNotEmpty) {
-      return '$label ($cook)';
-    }
     return label;
   }
 }
@@ -493,21 +486,11 @@ class FoodRepository {
 class ServingUnitInfo {
   final double servingWeight;
   final double servingCount;
-  final String groupName;
   final String groupShortName;
-  final String standardNutrient;
-  final String standardDesc;
-  final String summaryText;
 
   const ServingUnitInfo({
     required this.servingWeight,
     required this.servingCount,
-    required this.groupName,
     required this.groupShortName,
-    required this.standardNutrient,
-    required this.standardDesc,
-    required this.summaryText,
   });
-
-  String get singleLineText => summaryText;
 }

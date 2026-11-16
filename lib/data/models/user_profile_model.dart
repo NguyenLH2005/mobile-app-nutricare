@@ -44,6 +44,48 @@ class UserProfile {
     'Đạm sữa bò',
   ];
 
+  static const List<String> standardMedicalConditions = [
+    'Tiểu đường',
+    'Huyết áp cao',
+    'Mỡ máu',
+    'Tim mạch',
+    'Gout',
+    'Bệnh Thận',
+  ];
+
+  static const List<({double factor, String label})> activityLevels = [
+    (factor: 1.2, label: 'Ít vận động - Làm việc văn phòng'),
+    (factor: 1.375, label: 'Vận động nhẹ - Tập nhẹ 1-3 ngày/tuần'),
+    (factor: 1.55, label: 'Vận động vừa - Tập vừa 3-5 ngày/tuần'),
+    (factor: 1.725, label: 'Vận động nhiều - Tập nặng 6-7 ngày/tuần'),
+    (factor: 1.9, label: 'Vận động rất nhiều - VĐV, tập 2 lần/ngày'),
+  ];
+
+  static String activityLabelForFactor(double factor) {
+    for (final level in activityLevels) {
+      if (factor <= level.factor) return level.label;
+    }
+    return activityLevels.last.label;
+  }
+
+  static double calculateBmi(double weightKg, double heightCm) {
+    final heightInM = heightCm / 100.0;
+    return heightInM > 0 ? weightKg / (heightInM * heightInM) : 0.0;
+  }
+
+  static bool hasGoalConflictWithBmi(double bmi, String goal) {
+    return bmi >= 23.0 &&
+        ((bmi >= 25.0 && goal != 'Giảm cân') || goal == 'Tăng cân');
+  }
+
+  bool _flagAt(int index) => medicalFlags.length > index && medicalFlags[index] == '1';
+  bool get hasDiabetes => _flagAt(0);
+  bool get hasHypertension => _flagAt(1);
+  bool get hasLipidDisorder => _flagAt(2);
+  bool get hasGout => _flagAt(3);
+  bool get hasKidneyDisease => ceilingProteinKidney > 0 || _flagAt(4);
+  bool get hasCardioDisease => _flagAt(5);
+
   UserProfile({
     this.id,
     required this.dob,
@@ -92,25 +134,35 @@ class UserProfile {
     return list;
   }
 
-  static int calculateAge(String dob) {
-    int? year, month, day;
-    if (dob.contains('/')) {
-      final parts = dob.split('/');
+  static DateTime? parseDob(String dob) {
+    final text = dob.trim();
+    if (text.contains('/')) {
+      final parts = text.split('/');
       if (parts.length == 3) {
-        day = int.tryParse(parts[0]);
-        month = int.tryParse(parts[1]);
-        year = int.tryParse(parts[2]);
+        final day = int.tryParse(parts[0]);
+        final month = int.tryParse(parts[1]);
+        final year = int.tryParse(parts[2]);
+        if (year != null && month != null && day != null) {
+          return DateTime(year, month, day);
+        }
       }
-    } else if (dob.contains('-')) {
-      final parts = dob.split('-');
+    } else if (text.contains('-')) {
+      final parts = text.split('-');
       if (parts.length == 3) {
-        year = int.tryParse(parts[0]);
-        month = int.tryParse(parts[1]);
-        day = int.tryParse(parts[2]);
+        final year = int.tryParse(parts[0]);
+        final month = int.tryParse(parts[1]);
+        final day = int.tryParse(parts[2]);
+        if (year != null && month != null && day != null) {
+          return DateTime(year, month, day);
+        }
       }
     }
-    if (year != null && month != null && day != null) {
-      final dobDate = DateTime(year, month, day);
+    return DateTime.tryParse(text);
+  }
+
+  static int calculateAge(String dob) {
+    final dobDate = parseDob(dob);
+    if (dobDate != null) {
       final today = DateTime.now();
       int age = today.year - dobDate.year;
       if (today.month < dobDate.month || (today.month == dobDate.month && today.day < dobDate.day)) {
@@ -135,10 +187,7 @@ class UserProfile {
 
   int get age => calculateAge(dob);
 
-  double get bmi {
-    final heightInM = height / 100.0;
-    return (heightInM > 0) ? (weight / (heightInM * heightInM)) : 0.0;
-  }
+  double get bmi => calculateBmi(weight, height);
 
   factory UserProfile.create({
     int? id,
@@ -157,30 +206,22 @@ class UserProfile {
     final int age = calculateAge(dob);
 
     // BMI theo chuẩn Châu Á của WHO
-    final heightInM = height / 100.0;
-    final bmi = (heightInM > 0) ? (weight / (heightInM * heightInM)) : 0.0;
+    final bmi = calculateBmi(weight, height);
 
     // Chế độ kiểm soát béo phì chỉ kích hoạt được khi BMI >= 23 (tiền béo phì hoặc béo phì)
-    bool effectiveObesityMode = isObesityMode && (bmi >= 23.0);
+    final bool effectiveObesityMode = isObesityMode && (bmi >= 23.0);
 
     // 1. BMR theo Mifflin-St Jeor
-    double bmr;
-    if (gender == 'Nam') {
-      bmr = (10 * weight) + (6.25 * height) - (5 * age) + 5;
-    } else {
-      bmr = (10 * weight) + (6.25 * height) - (5 * age) - 161;
-    }
+    final double bmr = (10 * weight) + (6.25 * height) - (5 * age) + (gender == 'Nam' ? 5 : -161);
 
     // 2. TDEE
-    double tdee = bmr * activityFactor;
+    final double tdee = bmr * activityFactor;
 
     // 3. Target Calories & Goal
     // Nếu bật Chế độ kiểm soát béo phì: Mục tiêu khóa chặt là "Giảm cân", thâm hụt 500 kcal
-    String effectiveGoal = effectiveObesityMode ? 'Giảm cân' : goal;
+    final String effectiveGoal = effectiveObesityMode ? 'Giảm cân' : goal;
     double targetCalories = tdee;
-    if (effectiveObesityMode) {
-      targetCalories = tdee - 500;
-    } else if (effectiveGoal == 'Giảm cân') {
+    if (effectiveGoal == 'Giảm cân') {
       targetCalories = tdee - 500;
     } else if (effectiveGoal == 'Tăng cân') {
       targetCalories = tdee + 500;
@@ -192,12 +233,8 @@ class UserProfile {
     double ratioP = 0.20;
     double ratioC = 0.50;
     double ratioF = 0.30;
-    if (effectiveObesityMode) {
-      // Phân bổ macro tối ưu cho người béo phì giảm mỡ (30% P, 40% C, 30% F)
-      ratioP = 0.30;
-      ratioC = 0.40;
-      ratioF = 0.30;
-    } else if (effectiveGoal == 'Giảm cân') {
+    if (effectiveGoal == 'Giảm cân') {
+      // Phân bổ tối ưu cho giảm cân / giảm mỡ (30% P, 40% C, 30% F)
       ratioP = 0.30;
       ratioC = 0.40;
       ratioF = 0.30;
@@ -210,7 +247,7 @@ class UserProfile {
     double budgetProtein = (targetCalories * ratioP) / 4;
     double budgetCarb = (targetCalories * ratioC) / 4;
     double budgetFat = (targetCalories * ratioF) / 9;
-    double budgetFiber = 30.0;
+    const double budgetFiber = 30.0;
 
     final flags = encodeMedicalFlags(medicalConditions);
 

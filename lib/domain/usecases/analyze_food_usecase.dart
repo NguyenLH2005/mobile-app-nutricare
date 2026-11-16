@@ -66,6 +66,7 @@ class AnalyzeFoodUseCase {
         foodData,
         overrideLabel: isEgg ? null : detectedName,
       );
+      final String? initialCooking = foodData['cooking_method']?.toString().trim();
       final String mainGroup = foodData['Nhóm Dinh Dưỡng Chính']?.toString().trim() ?? 'Chưa phân loại';
 
       // 3. TÍNH TOÁN & ĐÓNG GÓI JSON
@@ -81,22 +82,14 @@ class AnalyzeFoodUseCase {
       final String? labelBase64 = await ImageCompressHelper.compressAndEncodeBase64(croppedLabelImage, maxDimension: 550, quality: 75);
 
       // 4. TÍNH KHẨU PHẦN CHUẨN & NGÀY TIÊU THỤ
-      double p100 = 0, c100 = 0, f100 = 0;
-      for (var item in nutritionArray) {
-        if (item['id'] == 'protein') p100 = (item['per_100g'] as num?)?.toDouble() ?? 0.0;
-        if (item['id'] == 'carb') c100 = (item['per_100g'] as num?)?.toDouble() ?? 0.0;
-        if (item['id'] == 'fat' || item['id'] == 'total_fat') f100 = (item['per_100g'] as num?)?.toDouble() ?? 0.0;
-      }
-      final servingInfo = repository.calculateServingUnit(
-        mainGroup: mainGroup,
-        p100: p100,
-        c100: c100,
-        f100: f100,
-        actualWeight: targetWeight,
+      final double servingUnits = repository.calculatePrimaryServingCount(
+        nutritionArray,
+        mainGroup,
+        targetWeight,
       );
 
       final now = DateTime.now();
-      final dateStr = '${now.year.toString().padLeft(4, '0')}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+      final dateStr = ScanHistory.formatDateYmd(now);
 
       // 5. TRẢ VỀ ĐỐI TƯỢNG LỊCH SỬ HOÀN CHỈNH
       return ScanHistory(
@@ -108,9 +101,10 @@ class AnalyzeFoodUseCase {
         labelImageBase64: labelBase64,
         foodName: displayFoodName,
         weight: detectedWeightInGrams,
-        servingUnits: servingInfo.servingCount,
+        servingUnits: servingUnits,
         consumptionRatio: 1.0,
         logDate: dateStr,
+        cookingMethod: (initialCooking != null && initialCooking.isNotEmpty) ? initialCooking : null,
         nutritionData: jsonNutritionData,
         mainGroup: mainGroup,
         createdAt: now,

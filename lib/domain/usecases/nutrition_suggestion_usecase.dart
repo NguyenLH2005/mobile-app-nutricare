@@ -2,7 +2,19 @@ import '../../data/models/user_profile_model.dart';
 import '../../data/datasources/remote/api_service.dart';
 
 class NutritionSuggestionUseCase {
-  static const String offlineMessage = '⚠️ Cần kết nối Internet để nhận lời khuyên dinh dưỡng từ chuyên gia AI.';
+  static const String offlineMessage = '📶 Cần kết nối Internet để nhận lời khuyên dinh dưỡng từ chuyên gia AI.';
+
+  static bool _isPurineRichFood(String foodNameLower) {
+    return foodNameLower.contains('bò') ||
+        foodNameLower.contains('heo') ||
+        foodNameLower.contains('cừu') ||
+        foodNameLower.contains('tôm') ||
+        foodNameLower.contains('cua') ||
+        foodNameLower.contains('mực') ||
+        foodNameLower.contains('tuộc') ||
+        foodNameLower.contains('hải sản') ||
+        foodNameLower.contains('vịt');
+  }
 
   static bool _matchesAllergen(String foodNameLower, String allergen) {
     if (allergen.contains('Đậu phộng') || allergen.contains('Lạc')) {
@@ -81,11 +93,10 @@ class NutritionSuggestionUseCase {
   }) {
     final List<Map<String, String>> result = [];
     final allergies = profile.allergies.map((a) => a.toLowerCase()).toList();
-    final flags = profile.medicalFlags;
-    final bool hasKidney = flags.length > 4 && flags[4] == '1';
-    final bool hasGout = flags.length > 3 && flags[3] == '1';
-    final bool hasDiabetes = flags.isNotEmpty && flags[0] == '1';
-    final bool hasLipid = flags.length > 2 && flags[2] == '1';
+    final bool hasKidney = profile.hasKidneyDisease;
+    final bool hasGout = profile.hasGout;
+    final bool hasDiabetes = profile.hasDiabetes;
+    final bool hasLipid = profile.hasLipidDisorder;
 
     for (final group in missingGroups) {
       final gLower = group.toLowerCase();
@@ -196,13 +207,12 @@ class NutritionSuggestionUseCase {
     final double potassium100 = double.tryParse(rawFoodData['Kali']?.toString() ?? '0') ?? 0;
     final double phosphorus100 = double.tryParse(rawFoodData['Photpho']?.toString() ?? '0') ?? 0;
 
-    final flags = profile.medicalFlags; // Chuỗi 6-bit
-    final bool hasDiabetes = flags.isNotEmpty && flags[0] == '1';
-    final bool hasHypertension = flags.length > 1 && flags[1] == '1';
-    final bool hasLipid = flags.length > 2 && flags[2] == '1';
-    final bool hasGout = flags.length > 3 && flags[3] == '1';
-    final bool hasKidney = flags.length > 4 && flags[4] == '1';
-    final bool hasCardio = flags.length > 5 && flags[5] == '1';
+    final bool hasDiabetes = profile.hasDiabetes;
+    final bool hasHypertension = profile.hasHypertension;
+    final bool hasLipid = profile.hasLipidDisorder;
+    final bool hasGout = profile.hasGout;
+    final bool hasKidney = profile.hasKidneyDisease;
+    final bool hasCardio = profile.hasCardioDisease;
 
     final String foodNameLower = foodName.toLowerCase();
     final double userWeight = (weight != null && weight > 0) ? weight : 100.0;
@@ -247,12 +257,7 @@ class NutritionSuggestionUseCase {
       } else if (hasLipid && (actualTransFat >= 0.5 || actualSatFat >= (profile.ceilingSatFat * 0.5))) {
         vetoReason = 'Bạn đang mắc bệnh Rối loạn lipid máu/Mỡ máu. Khẩu phần chứa Trans fat (${actualTransFat.toStringAsFixed(1)}g) hoặc Axit béo bão hòa vượt ngưỡng an toàn (${actualSatFat.toStringAsFixed(1)}g), gây tổn thương thành mạch và tăng mạnh cholesterol xấu.';
       } else if (hasGout) {
-        final bool isPurineRich = foodNameLower.contains('bò') || foodNameLower.contains('heo') || 
-                                  foodNameLower.contains('cừu') || foodNameLower.contains('tôm') || 
-                                  foodNameLower.contains('cua') || foodNameLower.contains('mực') || 
-                                  foodNameLower.contains('tuộc') || foodNameLower.contains('hải sản') ||
-                                  foodNameLower.contains('vịt');
-        if (isPurineRich && actualProtein >= 35.0) {
+        if (_isPurineRichFood(foodNameLower) && actualProtein >= 35.0) {
           vetoReason = 'Bạn đang mắc bệnh Gout. Khẩu phần thực phẩm giàu Purine/Đạm động vật này chứa tới ${actualProtein.toStringAsFixed(1)}g đạm động vật đậm đặc trong một bữa ăn, có nguy cơ kích hoạt cơn đau Gout cấp tính dữ dội.';
         }
       }
@@ -354,17 +359,13 @@ class NutritionSuggestionUseCase {
         });
       }
     }
-    if (hasGout && actualProtein > 0) {
-      if (foodNameLower.contains('bò') || foodNameLower.contains('heo') || foodNameLower.contains('cừu') || 
-          foodNameLower.contains('tôm') || foodNameLower.contains('cua') || foodNameLower.contains('mực') || 
-          foodNameLower.contains('tuộc') || foodNameLower.contains('hải sản')) {
-        final double pct = (profile.budgetProtein > 0) ? (actualProtein / profile.budgetProtein) * 100 : 0.0;
-        diseaseImpact.add({
-          'disease': 'Gout',
-          'nutrient': 'Purine / Đạm động vật',
-          'percentCeiling': double.parse(pct.toStringAsFixed(1)),
-        });
-      }
+    if (hasGout && actualProtein > 0 && _isPurineRichFood(foodNameLower)) {
+      final double pct = (profile.budgetProtein > 0) ? (actualProtein / profile.budgetProtein) * 100 : 0.0;
+      diseaseImpact.add({
+        'disease': 'Gout',
+        'nutrient': 'Purine / Đạm động vật',
+        'percentCeiling': double.parse(pct.toStringAsFixed(1)),
+      });
     }
     if (profile.isObesityMode && actualSugars > 0 && profile.ceilingSugar > 0 && !hasDiabetes) {
       final double pct = (actualSugars / profile.ceilingSugar) * 100;
@@ -411,16 +412,10 @@ class NutritionSuggestionUseCase {
       },
       'food': {
         'name': foodName,
-        'holdingWeight_g': actualWRounded,
         'actualWeight_g': actualWRounded,
         'mainGroups': rawGroups,
         'missingGroups': missingGroups,
         'suggestedSupplements': suggestedSupplements,
-        'metrics100g': {
-          'caloriesPercent': caloriesPercent,
-          'mainGroupsPercent': mainGroupsPercent,
-          'diseaseImpact': diseaseImpact,
-        },
         'metricsActual': {
           'caloriesPercent': caloriesPercent,
           'mainGroupsPercent': mainGroupsPercent,

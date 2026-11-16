@@ -3,11 +3,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
-import '../../data/models/scan_history_model.dart';
 import '../state/scan_controller.dart';
 import '../state/history_controller.dart';
 import 'found_object_screen.dart';
-import '../widgets/full_screen_image.dart';
+import '../widgets/scan_thumbnail.dart';
 
 class HistoryScreen extends ConsumerStatefulWidget {
   const HistoryScreen({super.key});
@@ -19,64 +18,6 @@ class HistoryScreen extends ConsumerStatefulWidget {
 class _HistoryScreenState extends ConsumerState<HistoryScreen> {
   bool isSelectionMode = false;
   Set<int> selectedIds = {};
-
-  Widget _buildThumbnail(ScanHistory item) {
-    final validFile = item.foodImageFile;
-    final memoryBytes = validFile == null ? item.foodImageBytes : null;
-
-    Widget content;
-    if (validFile != null) {
-      content = Image.file(
-        validFile,
-        width: 60,
-        height: 60,
-        fit: BoxFit.cover,
-        errorBuilder: (ctx, err, stack) => _buildPlaceholder(),
-      );
-    } else if (memoryBytes != null) {
-      content = Image.memory(
-        memoryBytes,
-        width: 60,
-        height: 60,
-        fit: BoxFit.cover,
-        errorBuilder: (ctx, err, stack) => _buildPlaceholder(),
-      );
-    } else {
-      content = _buildPlaceholder();
-    }
-
-    return GestureDetector(
-      onTap: () {
-        if (validFile != null || memoryBytes != null) {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => FullScreenImage(
-                imageFile: validFile,
-                imageBytes: memoryBytes,
-              ),
-            ),
-          );
-        }
-      },
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(8),
-        child: content,
-      ),
-    );
-  }
-
-  Widget _buildPlaceholder() {
-    return Container(
-      width: 60,
-      height: 60,
-      color: Colors.green.shade50,
-      child: const Icon(
-        Icons.fastfood,
-        color: Colors.green,
-      ),
-    );
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -206,26 +147,28 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
                 (e) => e['id'] == 'energy',
                 orElse: () => {'per_label': 0},
               );
-              final double cRatio = item.consumptionRatio > 0 ? item.consumptionRatio : 1.0;
+              final double cRatio = item.effectiveConsumptionRatio;
               final double rawKcal = (energyItem['per_label'] as num?)?.toDouble() ?? 0.0;
               final kcal = (rawKcal * cRatio).toStringAsFixed(0);
+              final itemId = item.id;
 
               return InkWell(
                 onLongPress: () {
-                  if (!isSelectionMode) {
+                  if (!isSelectionMode && itemId != null) {
                     setState(() {
                       isSelectionMode = true;
-                      selectedIds.add(item.id!);
+                      selectedIds.add(itemId);
                     });
                   }
                 },
                 onTap: () {
                   if (isSelectionMode) {
+                    if (itemId == null) return;
                     setState(() {
                       if (isSelected) {
-                        selectedIds.remove(item.id!);
+                        selectedIds.remove(itemId);
                       } else {
-                        selectedIds.add(item.id!);
+                        selectedIds.add(itemId);
                       }
                     });
                   } else {
@@ -269,7 +212,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
                           padding: const EdgeInsets.all(12),
                           child: Row(
                             children: [
-                              _buildThumbnail(item),
+                              ScanThumbnail(item: item, size: 60, openFullScreenOnTap: true),
                               const SizedBox(width: 16),
                               Expanded(
                                 child: Column(

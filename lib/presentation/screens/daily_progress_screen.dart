@@ -9,6 +9,7 @@ import '../state/scan_controller.dart';
 import '../state/sync_controller.dart';
 import 'found_object_screen.dart';
 import 'edit_profile_screen.dart';
+import '../widgets/scan_thumbnail.dart';
 
 class DailyProgressScreen extends ConsumerStatefulWidget {
   final String? initialDate;
@@ -40,12 +41,7 @@ class _DailyProgressScreenState extends ConsumerState<DailyProgressScreen> {
     _loadDailyScans();
   }
 
-  String get _dateStr {
-    final y = _selectedDate.year.toString().padLeft(4, '0');
-    final m = _selectedDate.month.toString().padLeft(2, '0');
-    final d = _selectedDate.day.toString().padLeft(2, '0');
-    return '$y-$m-$d';
-  }
+  String get _dateStr => ScanHistory.formatDateYmd(_selectedDate);
 
   String get _dateDisplayStr {
     final now = DateTime.now();
@@ -613,12 +609,11 @@ class _DailyProgressScreenState extends ConsumerState<DailyProgressScreen> {
 
   // --- 3B. NGƯỠNG Y KHOA & VI CHẤT (NATRI, KALI, PHOTPHO...) ---
   Widget _buildMicroAndCeilingsCard(UserProfile profile, Map<String, double> intake) {
-    final flags = profile.medicalFlags;
-    final bool hasDiabetes = flags.isNotEmpty && flags[0] == '1';
-    final bool hasHypertension = flags.length > 1 && flags[1] == '1';
-    final bool hasLipid = flags.length > 2 && flags[2] == '1';
-    final bool hasKidney = profile.ceilingProteinKidney > 0;
-    final bool hasCardio = flags.length > 5 && flags[5] == '1';
+    final bool hasDiabetes = profile.hasDiabetes;
+    final bool hasHypertension = profile.hasHypertension;
+    final bool hasLipid = profile.hasLipidDisorder;
+    final bool hasKidney = profile.hasKidneyDisease;
+    final bool hasCardio = profile.hasCardioDisease;
 
     final List<Widget> primaryRows = [
       _buildMicroProgressRow(
@@ -1045,8 +1040,7 @@ class _DailyProgressScreenState extends ConsumerState<DailyProgressScreen> {
     }
 
     // Cảnh báo Bệnh Thận (KDIGO 2024: Đạm, Kali, Photpho)
-    final bool hasKidney = profile.ceilingProteinKidney > 0 ||
-        (profile.medicalFlags.length > 4 && profile.medicalFlags[4] == '1');
+    final bool hasKidney = profile.hasKidneyDisease;
     if (hasKidney && intake['protein']! > profile.ceilingProteinKidney && profile.ceilingProteinKidney > 0) {
       alerts.add(_buildAlertBanner(
         title: 'CẢNH BÁO KDIGO: Vượt trần đạm bệnh Thận: ${intake['protein']!.toStringAsFixed(1)} / ${profile.ceilingProteinKidney.toStringAsFixed(1)} g',
@@ -1071,8 +1065,7 @@ class _DailyProgressScreenState extends ConsumerState<DailyProgressScreen> {
       ));
     }
 
-    final bool hasLipid = profile.medicalFlags.length > 2 && profile.medicalFlags[2] == '1';
-    if (hasLipid && (intake['satFat'] ?? 0.0) > profile.ceilingSatFat && profile.ceilingSatFat > 0) {
+    if (profile.hasLipidDisorder && (intake['satFat'] ?? 0.0) > profile.ceilingSatFat && profile.ceilingSatFat > 0) {
       alerts.add(_buildAlertBanner(
         title: 'CẢNH BÁO: Vượt trần Chất béo bão hòa: ${intake['satFat']!.toStringAsFixed(1)} / ${profile.ceilingSatFat.toStringAsFixed(1)} g',
         desc: 'Lượng chất béo bão hòa vượt ngưỡng kiểm soát mỡ máu. Hãy tránh mỡ động vật, đồ chiên rán và chọn thịt nạc/cá hấp.',
@@ -1207,30 +1200,6 @@ class _DailyProgressScreenState extends ConsumerState<DailyProgressScreen> {
       }
     }
 
-    Widget imageWidget = Container(
-      width: 52,
-      height: 52,
-      decoration: BoxDecoration(
-        color: Colors.grey.shade200,
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: const Icon(Icons.fastfood, color: Colors.grey),
-    );
-
-    final imgFile = scan.foodImageFile;
-    final imgBytes = imgFile == null ? scan.foodImageBytes : null;
-    if (imgFile != null) {
-      imageWidget = ClipRRect(
-        borderRadius: BorderRadius.circular(8),
-        child: Image.file(imgFile, width: 52, height: 52, fit: BoxFit.cover),
-      );
-    } else if (imgBytes != null) {
-      imageWidget = ClipRRect(
-        borderRadius: BorderRadius.circular(8),
-        child: Image.memory(imgBytes, width: 52, height: 52, fit: BoxFit.cover),
-      );
-    }
-
     final String timeStr = '${scan.createdAt.hour.toString().padLeft(2, '0')}:${scan.createdAt.minute.toString().padLeft(2, '0')}';
 
     return InkWell(
@@ -1257,16 +1226,14 @@ class _DailyProgressScreenState extends ConsumerState<DailyProgressScreen> {
         ),
         child: Row(
           children: [
-            imageWidget,
+            ScanThumbnail(item: scan, size: 52),
             const SizedBox(width: 12),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    scan.foodName.isNotEmpty
-                        ? '${scan.foodName[0].toUpperCase()}${scan.foodName.substring(1)}'
-                        : 'Món ăn',
+                    scan.capitalizedFoodName.isNotEmpty ? scan.capitalizedFoodName : 'Món ăn',
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(

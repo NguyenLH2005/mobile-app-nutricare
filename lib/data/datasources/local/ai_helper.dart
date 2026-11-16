@@ -8,7 +8,7 @@ import 'package:tflite_flutter/tflite_flutter.dart';
 import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
 
 class AIHelper {
-  String removeDiacritics(String str) {
+  String _removeDiacritics(String str) {
     var withDia = 'àáạảãâầấậẩẫăằắặẳẵèéẹẻẽêềếệểễìíịỉĩòóọỏõôồốộổỗơờớợởỡùúụủũưừứựửữỳýỵỷỹđÀÁẠẢÃÂẦẤẬẨẪĂẰẮẶẲẴÈÉẸẺẼÊỀẾỆỂỄÌÍỊỈĨÒÓỌỎÕÔỒỐỘỔỖƠỜỚỢỞỠÙÚỤỦŨƯỪỨỰỬỮỲÝỴỶỸĐ';
     var withoutDia = 'aaaaaaaaaaaaaaaaaeeeeeeeeeeeiiiiiooooooooooooooooouuuuuuuuuuuyyyyydAAAAAAAAAAAAAAAAAEEEEEEEEEEEIIIIIOOOOOOOOOOOOOOOOOUUUUUUUUUUUYYYYYD';
     for (int i = 0; i < withDia.length; i++) {
@@ -37,7 +37,7 @@ class AIHelper {
   ];
 
   Future<void> init() async {
-    _cropInterpreter ??= await Interpreter.fromAsset('assets/models/yolo26_safe_int8.tflite');
+    _cropInterpreter ??= await Interpreter.fromAsset('assets/models/crop_model.tflite');
     _classifyInterpreter ??= await Interpreter.fromAsset('assets/models/classify_model.tflite');
   }
 
@@ -131,6 +131,24 @@ class AIHelper {
       }
     }
 
+    Future<String> saveCroppedImage({
+      required int x,
+      required int y,
+      required int width,
+      required int height,
+      required String filePrefix,
+    }) async {
+      final directory = await getTemporaryDirectory();
+      final path = '${directory.path}/${filePrefix}_${DateTime.now().millisecondsSinceEpoch}.jpg';
+
+      await Isolate.run(() {
+        final cropped = img.copyCrop(originalImage, x: x, y: y, width: width, height: height);
+        File(path).writeAsBytesSync(img.encodeJpg(cropped));
+      });
+
+      return path;
+    }
+
     // Hàm phụ trợ để giải mã tọa độ và cắt ảnh an toàn tuyệt đối
     Future<String> cropAndSave(int index) async {
       double xc = isTransposed ? output[0][index][0] : output[0][0][index];
@@ -146,29 +164,21 @@ class AIHelper {
         h *= inputSize;
       }
 
-      double x1 = xc - w / 2;
-      double y1 = yc - h / 2;
+      final double x1 = xc - w / 2;
+      final double y1 = yc - h / 2;
 
-      int cropX = (x1 / inputSize * origW).toInt();
-      int cropY = (y1 / inputSize * origH).toInt();
-      int cropW = (w / inputSize * origW).toInt();
-      int cropH = (h / inputSize * origH).toInt();
+      final int cropX = (x1 / inputSize * origW).toInt().clamp(0, origW - 1);
+      final int cropY = (y1 / inputSize * origH).toInt().clamp(0, origH - 1);
+      final int cropW = (w / inputSize * origW).toInt().clamp(1, origW - cropX);
+      final int cropH = (h / inputSize * origH).toInt().clamp(1, origH - cropY);
 
-      // Bảo vệ biên chống tràn và chống số âm (crash-proof clamping)
-      cropX = cropX.clamp(0, origW - 1);
-      cropY = cropY.clamp(0, origH - 1);
-      cropW = cropW.clamp(1, origW - cropX);
-      cropH = cropH.clamp(1, origH - cropY);
-
-      final directory = await getTemporaryDirectory();
-      final path = '${directory.path}/crop_${DateTime.now().millisecondsSinceEpoch}_$index.jpg';
-      
-      await Isolate.run(() {
-        img.Image cropped = img.copyCrop(originalImage, x: cropX, y: cropY, width: cropW, height: cropH);
-        File(path).writeAsBytesSync(img.encodeJpg(cropped));
-      });
-
-      return path;
+      return saveCroppedImage(
+        x: cropX,
+        y: cropY,
+        width: cropW,
+        height: cropH,
+        filePrefix: 'crop_$index',
+      );
     }
 
     // Hàm dự phòng cắt vùng trung tâm 85% ảnh nếu góc chụp mờ hoặc không vượt ngưỡng tin cậy
@@ -178,15 +188,13 @@ class AIHelper {
       final int cropX = ((origW - cropW) / 2).toInt().clamp(0, origW - 1);
       final int cropY = ((origH - cropH) / 2).toInt().clamp(0, origH - 1);
 
-      final directory = await getTemporaryDirectory();
-      final path = '${directory.path}/crop_fallback_${DateTime.now().millisecondsSinceEpoch}.jpg';
-      
-      await Isolate.run(() {
-        img.Image cropped = img.copyCrop(originalImage, x: cropX, y: cropY, width: cropW, height: cropH);
-        File(path).writeAsBytesSync(img.encodeJpg(cropped));
-      });
-
-      return path;
+      return saveCroppedImage(
+        x: cropX,
+        y: cropY,
+        width: cropW,
+        height: cropH,
+        filePrefix: 'crop_fallback',
+      );
     }
 
     String croppedFoodPath;
@@ -274,8 +282,8 @@ class AIHelper {
       
       if (lines.isEmpty) return null;
       String fullText = lines.join(" ");
-      String normalizedText = removeDiacritics(fullText).toLowerCase();
-      List<String> normalizedLines = lines.map((l) => removeDiacritics(l).toLowerCase()).toList();
+      String normalizedText = _removeDiacritics(fullText).toLowerCase();
+      List<String> normalizedLines = lines.map((l) => _removeDiacritics(l).toLowerCase()).toList();
       
       int klIndex = -1;
       int donGiaIndex = -1;
@@ -290,6 +298,7 @@ class AIHelper {
         }
       }
 
+      // Loại trừ ngữ cảnh đơn giá (VD: 25.000 d/100g) khỏi vị trí khối lượng
       if (donGiaIndex != -1 && (klIndex == donGiaIndex || (klIndex - donGiaIndex).abs() <= 1)) {
         klIndex = -1;
       }
@@ -308,47 +317,40 @@ class AIHelper {
           try {
             double val = double.parse(numStr);
             if ('.'.allMatches(numStr).length <= 1) {
-               if (!numStr.contains('.') && !numStr.contains(',') && numStr.length >= 4 && numStr.startsWith('0')) {
-                   val = val / 1000;
-               }
-               if (val >= 0.001 && val <= 5000) {
-                 String valStr = (val == val.toInt()) ? val.toInt().toString() : val.toString().replaceAll(RegExp(r'0*$'), '').replaceAll(RegExp(r'\.$'), '');
-                 weightCandidate = '$valStr${match.group(2)!.toUpperCase()}';
-               }
+              if (!numStr.contains('.') && !numStr.contains(',') && numStr.length >= 4 && numStr.startsWith('0')) {
+                val = val / 1000;
+              }
+              if (val >= 0.001 && val <= 5000) {
+                weightCandidate = _formatWeightToken(val, match.group(2)!.toUpperCase());
+              }
             }
           } catch (_) {}
         }
       }
 
-      // Logic 2: Theo Bảng 2.5 Mục 2.4.3, các số liệu thuộc khu vực Đơn giá (VD: 25.000 d/100g)
-      // là đơn vị tính giá, tuyệt đối KHÔNG lấy làm khối lượng tịnh của sản phẩm.
-      // Do đó, ta loại trừ toàn bộ ngữ cảnh đơn giá khỏi tập ứng viên khối lượng.
-
-      // Logic 3: Chạy Regex vét máng
+      // Logic 2: Chạy Regex vét máng trên toàn bộ tem
       weightCandidate ??= _extractByRegex(normalizedText);
 
-      // Logic 4: Fallback số đơn lẻ quanh khu vực KL
+      // Logic 3: Fallback số đơn lẻ quanh khu vực KL
       if (weightCandidate == null && klIndex != -1) {
         final matches = RegExp(r'(\d+[\.,]?\d*)').allMatches(context);
         for (final m in matches) {
-           String numStr = m.group(1)!.replaceAll(',', '.');
-           try {
-              double val = double.parse(numStr);
-              if ('.'.allMatches(numStr).length <= 1 && val > 0 && val <= 5000) {
-                 if (val > 1000 && numStr.endsWith('9') && numStr.length <= 4) {
-                    val = (val - 9) / 10;
-                 }
-                 String dv = (val < 15) ? 'KG' : 'G';
-                 String valStr = (val == val.toInt()) ? val.toInt().toString() : val.toString().replaceAll(RegExp(r'0*$'), '').replaceAll(RegExp(r'\.$'), '');
-                 weightCandidate = '$valStr$dv';
-                 break;
+          String numStr = m.group(1)!.replaceAll(',', '.');
+          try {
+            double val = double.parse(numStr);
+            if ('.'.allMatches(numStr).length <= 1 && val > 0 && val <= 5000) {
+              if (val > 1000 && numStr.endsWith('9') && numStr.length <= 4) {
+                val = (val - 9) / 10;
               }
-           } catch (_) {}
+              weightCandidate = _formatWeightToken(val, (val < 15) ? 'KG' : 'G');
+              break;
+            }
+          } catch (_) {}
         }
       }
 
       if (weightCandidate != null) {
-          weightCandidate = weightCandidate.replaceAll(RegExp(r'9G$', caseSensitive: false), 'G');
+        weightCandidate = weightCandidate.replaceAll(RegExp(r'9G$', caseSensitive: false), 'G');
       }
 
       return weightCandidate;
@@ -359,12 +361,25 @@ class AIHelper {
     }
   }
 
+  String _formatWeightToken(double value, String unit) {
+    final valStr = (value == value.toInt())
+        ? value.toInt().toString()
+        : value.toString().replaceAll(RegExp(r'0*$'), '').replaceAll(RegExp(r'\.$'), '');
+    return '$valStr$unit';
+  }
+
+  String _resolveUnitToken(double value, String? rawUnit) {
+    if (rawUnit == null) return (value < 15) ? 'KG' : 'G';
+    final upper = rawUnit.toUpperCase();
+    return upper == 'K' ? 'KG' : upper;
+  }
+
   String? _extractByRegex(String vanBanTho) {
     if (vanBanTho.isEmpty) return null;
 
     String vanBanSach = vanBanTho.replaceAll(RegExp(r'\b\d+[.,]\d+[.,]\d+\b'), '');
     vanBanSach = vanBanSach.replaceAll(RegExp(r'\b\d{6,}\b'), '');
-    // Loại trừ đơn giá kèm quy cách tính (VD: 25000d/100g hoặc /kg) theo Bảng 2.5 Mục 2.4.3
+    // Loại trừ đơn giá kèm quy cách tính (VD: 25000d/100g hoặc /kg)
     vanBanSach = vanBanSach.replaceAll(RegExp(r'(?:don\s*gia|gia)?[^\w]{0,5}\d+[.,\d]*\s*(?:d|vnd|dong)?\s*/\s*(?:100g|kg|g)', caseSensitive: false), '');
 
     final patternKw = RegExp(r'(?:khoi luong|trong luong|kl|tl)\s*(?:tinh)?[^\d]{0,15}?(\d+(?:[.,]\d+)?)\s*(g|kg|gr|k)?', caseSensitive: false);
@@ -372,12 +387,7 @@ class AIHelper {
       try {
         double so = double.parse(m.group(1)!.replaceAll(',', '.'));
         if (so > 0 && so <= 50000) {
-           String dv = (so < 15) ? 'KG' : 'G';
-           if (m.groupCount >= 2 && m.group(2) != null) {
-              dv = (m.group(2)!.toUpperCase() == 'K') ? 'KG' : m.group(2)!.toUpperCase();
-           }
-           String soStr = (so == so.toInt()) ? so.toInt().toString() : so.toString().replaceAll(RegExp(r'0*$'), '').replaceAll(RegExp(r'\.$'), '');
-           return '$soStr$dv';
+          return _formatWeightToken(so, _resolveUnitToken(so, m.groupCount >= 2 ? m.group(2) : null));
         }
       } catch (_) {}
     }
@@ -387,12 +397,7 @@ class AIHelper {
       try {
         double so = double.parse(m.group(1)!.replaceAll(',', '.'));
         if (so >= 0.01 && so <= 50000) {
-           String dv = (so < 15) ? 'KG' : 'G';
-           if (m.groupCount >= 2 && m.group(2) != null) {
-              dv = (m.group(2)!.toUpperCase() == 'K') ? 'KG' : m.group(2)!.toUpperCase();
-           }
-           String soStr = (so == so.toInt()) ? so.toInt().toString() : so.toString().replaceAll(RegExp(r'0*$'), '').replaceAll(RegExp(r'\.$'), '');
-           return '$soStr$dv';
+          return _formatWeightToken(so, _resolveUnitToken(so, m.groupCount >= 2 ? m.group(2) : null));
         }
       } catch (_) {}
     }
@@ -402,16 +407,14 @@ class AIHelper {
       try {
         double val = double.parse(m.group(1)!.replaceAll(',', '.'));
         if (val > 1000 && m.group(1)!.endsWith('9') && m.group(1)!.length <= 4) {
-           val = (val - 9) / 10;
+          val = (val - 9) / 10;
         }
 
         if (val > 0 && val <= 5000) {
-           if (m.group(1)!.length == 3 && m.group(1)!.startsWith('0') && val < 100) {
-              val = val / 100.0;
-           }
-           String dv = (val < 15) ? 'KG' : 'G';
-           String valStr = (val == val.toInt()) ? val.toInt().toString() : val.toString().replaceAll(RegExp(r'0*$'), '').replaceAll(RegExp(r'\.$'), '');
-           return '$valStr$dv';
+          if (m.group(1)!.length == 3 && m.group(1)!.startsWith('0') && val < 100) {
+            val = val / 100.0;
+          }
+          return _formatWeightToken(val, (val < 15) ? 'KG' : 'G');
         }
       } catch (_) {}
     }
