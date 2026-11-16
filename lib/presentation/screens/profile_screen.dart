@@ -400,7 +400,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           // Hàng 4: Chỉ số BMI (có nút mũi tên xổ xuống giải thích)
           _buildExpandableMetricRow(
             title: 'Chỉ số BMI',
-            subtitle: 'Chỉ số khối cơ thể',
             value: '${bmi.toStringAsFixed(1)} • $bmiCategory',
             valueColor: bmiColor,
             explanationKey: 'bmi',
@@ -537,7 +536,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           // 1. Hàng BMR
           _buildExpandableMetricRow(
             title: 'BMR',
-            subtitle: 'Năng lượng chuyển hóa cơ bản',
             value: '${profile.bmr.toStringAsFixed(0)} kcal/ngày',
             explanationKey: 'bmr',
             definitionText: 'Năng lượng tối thiểu cơ thể cần để duy trì sự sống khi nghỉ ngơi suốt 24 giờ.',
@@ -547,7 +545,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           // 2. Hàng TDEE
           _buildExpandableMetricRow(
             title: 'TDEE',
-            subtitle: 'Tổng năng lượng tiêu hao mỗi ngày',
             value: '${profile.tdee.toStringAsFixed(0)} kcal/ngày',
             explanationKey: 'tdee',
             definitionText: 'Tổng lượng calo cơ thể đốt cháy mỗi ngày, gồm BMR, vận động và tiêu hóa thức ăn.',
@@ -557,7 +554,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           // 3. Hàng Calo Mục Tiêu
           _buildExpandableMetricRow(
             title: 'Calo Mục Tiêu',
-            subtitle: 'Lượng calo nạp theo kế hoạch',
             value: '${profile.targetCalories.toStringAsFixed(0)} kcal/ngày',
             explanationKey: 'target',
             valueColor: Colors.green.shade800,
@@ -832,12 +828,12 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
           // Đường
           _buildCeilingRow(
-            label: 'Đường tự do (Free Sugars)',
+            label: 'Đường tự do',
             value: '<= ${profile.ceilingSugar.toStringAsFixed(1)} g/ngày',
             isAffected: hasDiabetes || profile.isObesityMode,
             reason: hasDiabetes
-                ? 'Do bạn mắc bệnh Tiểu đường • Khống chế <= 5% calo'
-                : (profile.isObesityMode ? 'Do chế độ kiểm soát béo phì • Khống chế <= 5% calo' : null),
+                ? 'Tiểu đường (<= 5% calo)'
+                : (profile.isObesityMode ? 'Kiểm soát béo phì (<= 5% calo)' : null),
           ),
           const Divider(height: 12),
 
@@ -847,47 +843,47 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             value: '<= ${profile.ceilingSodium.toStringAsFixed(0)} mg/ngày',
             isAffected: hasHypertension || hasCardio,
             reason: (hasHypertension && hasCardio)
-                ? 'Do bạn mắc bệnh Tăng huyết áp & Tim mạch'
+                ? 'Tăng huyết áp & Tim mạch'
                 : (hasHypertension
-                    ? 'Do bạn mắc bệnh Tăng huyết áp'
-                    : (hasCardio ? 'Do bạn mắc bệnh Tim mạch' : null)),
+                    ? 'Tăng huyết áp'
+                    : (hasCardio ? 'Tim mạch' : null)),
           ),
           const Divider(height: 12),
 
           // Béo bão hòa
           _buildCeilingRow(
-            label: 'Chất béo bão hòa (Saturated Fat)',
+            label: 'Chất béo bão hòa',
             value: '<= ${profile.ceilingSatFat.toStringAsFixed(1)} g/ngày',
             isAffected: hasLipid,
-            reason: hasLipid ? 'Do bạn mắc bệnh Rối loạn lipid máu/Mỡ máu • Dưới 7% calo' : null,
+            reason: hasLipid ? 'Rối loạn lipid máu (< 7% calo)' : null,
           ),
           const Divider(height: 12),
 
           // Kali
           _buildCeilingRow(
-            label: 'Kali (Potassium)',
+            label: 'Kali',
             value: hasKidney ? '<= 2000 mg/ngày' : '3500 - 4700 mg/ngày',
             isAffected: hasKidney,
-            reason: hasKidney ? 'Do bạn mắc bệnh Thận mạn • Giảm khả năng bài tiết Kali' : null,
+            reason: hasKidney ? 'Bệnh Thận mạn' : null,
           ),
           const Divider(height: 12),
 
           // Photpho
           _buildCeilingRow(
-            label: 'Photpho (Phosphorus)',
+            label: 'Photpho',
             value: hasKidney ? '<= 800 mg/ngày' : '700 - 1000 mg/ngày',
             isAffected: hasKidney,
-            reason: hasKidney ? 'Do bạn mắc bệnh Thận mạn • Ngừa lắng đọng khoáng chất' : null,
+            reason: hasKidney ? 'Bệnh Thận mạn' : null,
           ),
 
           // Đạm thận (nếu có bệnh thận)
           if (hasKidney) ...[
             const Divider(height: 12),
             _buildCeilingRow(
-              label: 'Chất đạm (Protein)',
+              label: 'Chất đạm (KDIGO)',
               value: '<= ${profile.ceilingProteinKidney.toStringAsFixed(1)} g/ngày',
               isAffected: true,
-              reason: 'Do bạn mắc bệnh Thận mạn • Kiểm soát 0.8g/kg/ngày theo KDIGO 2024',
+              reason: 'Bệnh Thận mạn (0.8g/kg/ngày)',
             ),
           ],
 
@@ -895,22 +891,22 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           if (hasGout) ...[
             const Divider(height: 12),
             _buildCeilingRow(
-              label: 'Đạm giàu Purine - Bệnh Gout',
+              label: 'Đạm giàu Purine',
               value: '<= 25 g/bữa ăn',
               isAffected: true,
-              reason: 'Do bạn mắc bệnh Gout • Hạn chế thịt đỏ, hải sản vỏ cứng để tránh kích hoạt cơn Gout cấp',
+              reason: 'Bệnh Gout',
             ),
           ],
 
           // Nhu cầu Chất xơ chuẩn hóa theo Viện Dinh Dưỡng & WHO
           const Divider(height: 12),
           _buildCeilingRow(
-            label: 'Chất xơ (Dietary Fiber)',
+            label: 'Chất xơ',
             value: '>= ${profile.budgetFiber.toStringAsFixed(0)} g/ngày',
             isAffected: profile.isObesityMode || hasDiabetes || hasLipid,
             reason: (profile.isObesityMode || hasDiabetes || hasLipid)
-                ? 'Khuyến nghị tăng cường chất xơ giúp ổn định đường huyết, kiểm soát cân nặng & giảm mỡ máu'
-                : 'Mức khuyến nghị tối thiểu bảo vệ hệ tiêu hóa của Viện Dinh Dưỡng NIN',
+                ? 'Hỗ trợ đường huyết, cân nặng & mỡ máu'
+                : null,
           ),
         ],
       ),

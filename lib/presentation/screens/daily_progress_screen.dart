@@ -622,19 +622,17 @@ class _DailyProgressScreenState extends ConsumerState<DailyProgressScreen> {
 
     final List<Widget> primaryRows = [
       _buildMicroProgressRow(
-        label: 'Natri (Muối)',
+        label: 'Natri',
         current: intake['sodium'] ?? 0.0,
         maxLimit: profile.ceilingSodium > 0 ? profile.ceilingSodium : 2000.0,
         unit: 'mg',
         decimals: 0,
         isUpperLimit: true,
         accentColor: Colors.teal,
-        subtitle: (hasHypertension || hasCardio)
-            ? 'Trần bệnh Tăng huyết áp / Tim mạch'
-            : 'Trần an toàn WHO',
+        conditionTag: (hasHypertension || hasCardio) ? 'Tim mạch' : null,
       ),
       _buildMicroProgressRow(
-        label: 'Kali (Potassium)',
+        label: 'Kali',
         current: intake['potassium'] ?? 0.0,
         minTarget: hasKidney ? null : 3500.0,
         maxLimit: hasKidney ? 2000.0 : 4700.0,
@@ -642,12 +640,10 @@ class _DailyProgressScreenState extends ConsumerState<DailyProgressScreen> {
         decimals: 0,
         isUpperLimit: hasKidney,
         accentColor: Colors.indigo,
-        subtitle: hasKidney
-            ? 'Trần bệnh Thận mạn (<= 2000 mg)'
-            : 'Mức khuyến nghị 3500 - 4700 mg/ngày',
+        conditionTag: hasKidney ? 'Thận mạn' : null,
       ),
       _buildMicroProgressRow(
-        label: 'Photpho (Phosphorus)',
+        label: 'Photpho',
         current: intake['phosphorus'] ?? 0.0,
         minTarget: hasKidney ? null : 700.0,
         maxLimit: hasKidney ? 800.0 : 1000.0,
@@ -655,25 +651,21 @@ class _DailyProgressScreenState extends ConsumerState<DailyProgressScreen> {
         decimals: 0,
         isUpperLimit: hasKidney,
         accentColor: Colors.deepPurple,
-        subtitle: hasKidney
-            ? 'Trần bệnh Thận mạn (<= 800 mg)'
-            : 'Mức khuyến nghị 700 - 1000 mg/ngày',
+        conditionTag: hasKidney ? 'Thận mạn' : null,
       ),
     ];
 
     final List<Widget> extraRows = [];
 
     final sugarRow = _buildMicroProgressRow(
-      label: 'Đường tự do (Sugars)',
+      label: 'Đường tự do',
       current: intake['sugar'] ?? 0.0,
       maxLimit: profile.ceilingSugar > 0 ? profile.ceilingSugar : 25.0,
       unit: 'g',
       decimals: 1,
       isUpperLimit: true,
       accentColor: Colors.amber.shade800,
-      subtitle: (hasDiabetes || profile.isObesityMode)
-          ? 'Trần Tiểu đường / Béo phì (<= 5% calo)'
-          : 'Trần khuyến nghị WHO',
+      conditionTag: hasDiabetes ? 'Tiểu đường' : (profile.isObesityMode ? 'Béo phì' : null),
     );
     if (hasDiabetes || profile.isObesityMode) {
       primaryRows.add(sugarRow);
@@ -689,9 +681,7 @@ class _DailyProgressScreenState extends ConsumerState<DailyProgressScreen> {
       decimals: 1,
       isUpperLimit: true,
       accentColor: Colors.brown,
-      subtitle: hasLipid
-          ? 'Trần Rối loạn lipid máu (< 7% calo)'
-          : 'Trần khuyến nghị (< 10% calo)',
+      conditionTag: hasLipid ? 'Mỡ máu' : null,
     );
     if (hasLipid) {
       primaryRows.add(satFatRow);
@@ -702,14 +692,14 @@ class _DailyProgressScreenState extends ConsumerState<DailyProgressScreen> {
     if (hasKidney && profile.ceilingProteinKidney > 0) {
       primaryRows.add(
         _buildMicroProgressRow(
-          label: 'Trần đạm KDIGO (Thận)',
+          label: 'Trần đạm KDIGO',
           current: intake['protein'] ?? 0.0,
           maxLimit: profile.ceilingProteinKidney,
           unit: 'g',
           decimals: 1,
           isUpperLimit: true,
           accentColor: Colors.deepOrange,
-          subtitle: 'Giới hạn 0.8g đạm/kg cho bệnh Thận mạn',
+          conditionTag: 'Thận mạn',
         ),
       );
     }
@@ -744,15 +734,19 @@ class _DailyProgressScreenState extends ConsumerState<DailyProgressScreen> {
                   style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF1B233A)),
                 ),
               ),
+              Tooltip(
+                message: 'Đường & béo bão hòa tính theo thực phẩm có công bố dữ liệu trong bảng thành phần.',
+                child: Icon(Icons.info_outline, size: 17, color: Colors.grey.shade500),
+              ),
             ],
           ),
           const SizedBox(height: 14),
           for (int i = 0; i < visibleRows.length; i++) ...[
-            if (i > 0) const Divider(height: 20),
+            if (i > 0) const Divider(height: 18),
             visibleRows[i],
           ],
           if (extraRows.isNotEmpty) ...[
-            const SizedBox(height: 10),
+            const SizedBox(height: 8),
             Center(
               child: TextButton.icon(
                 onPressed: () {
@@ -767,10 +761,10 @@ class _DailyProgressScreenState extends ConsumerState<DailyProgressScreen> {
                 ),
                 label: Text(
                   _showAllMicronutrients
-                      ? 'Thu gọn chỉ số phụ'
-                      : 'Xem thêm ${extraRows.length} chỉ số (Đường, Béo bão hòa)',
+                      ? 'Thu gọn'
+                      : 'Xem thêm (${extraRows.length})',
                   style: TextStyle(
-                    fontSize: 12,
+                    fontSize: 12.5,
                     fontWeight: FontWeight.w600,
                     color: Colors.teal.shade700,
                   ),
@@ -778,14 +772,6 @@ class _DailyProgressScreenState extends ConsumerState<DailyProgressScreen> {
               ),
             ),
           ],
-          if (_showAllMicronutrients || hasDiabetes || profile.isObesityMode || hasLipid)
-            Padding(
-              padding: const EdgeInsets.only(top: 4),
-              child: Text(
-                '* Lưu ý: Đường tổng số & chất béo bão hòa tính theo các thực phẩm có công bố dữ liệu trong bảng thành phần.',
-                style: TextStyle(fontSize: 11, color: Colors.grey.shade600, fontStyle: FontStyle.italic),
-              ),
-            ),
         ],
       ),
     );
@@ -800,7 +786,7 @@ class _DailyProgressScreenState extends ConsumerState<DailyProgressScreen> {
     required int decimals,
     required bool isUpperLimit,
     required Color accentColor,
-    required String subtitle,
+    String? conditionTag,
   }) {
     final String curStr = current.toStringAsFixed(decimals);
     final String targetStr = (!isUpperLimit && minTarget != null)
@@ -818,10 +804,10 @@ class _DailyProgressScreenState extends ConsumerState<DailyProgressScreen> {
         statusText = 'Vượt trần';
       } else if (maxLimit > 0 && current / maxLimit >= 0.85) {
         barColor = Colors.orange.shade800;
-        statusText = 'Sắp chạm trần';
+        statusText = 'Sắp chạm';
       } else {
         barColor = accentColor;
-        statusText = 'Trong ngưỡng';
+        statusText = 'An toàn';
       }
     } else {
       final double refTarget = (minTarget != null && minTarget > 0) ? minTarget : maxLimit;
@@ -834,7 +820,7 @@ class _DailyProgressScreenState extends ConsumerState<DailyProgressScreen> {
         statusText = 'Đạt chuẩn';
       } else {
         barColor = Colors.amber.shade800;
-        statusText = 'Cao hơn khuyến nghị';
+        statusText = 'Hơi cao';
       }
     }
 
@@ -842,34 +828,44 @@ class _DailyProgressScreenState extends ConsumerState<DailyProgressScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             Expanded(
-              child: Text(
-                label,
-                style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+              child: Wrap(
+                crossAxisAlignment: WrapCrossAlignment.center,
+                spacing: 6,
+                runSpacing: 2,
+                children: [
+                  Text(
+                    label,
+                    style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13.5),
+                  ),
+                  if (conditionTag != null)
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                      decoration: BoxDecoration(
+                        color: Colors.red.shade50,
+                        borderRadius: BorderRadius.circular(4),
+                        border: Border.all(color: Colors.red.shade200),
+                      ),
+                      child: Text(
+                        conditionTag,
+                        style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.w600, color: Colors.red.shade700),
+                      ),
+                    ),
+                ],
               ),
             ),
+            const SizedBox(width: 8),
             Text(
               '$curStr / $targetStr',
               style: TextStyle(
                 fontWeight: FontWeight.bold,
-                fontSize: 13,
+                fontSize: 12.5,
                 color: barColor,
               ),
             ),
-          ],
-        ),
-        const SizedBox(height: 3),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Expanded(
-              child: Text(
-                subtitle,
-                style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
-              ),
-            ),
+            const SizedBox(width: 6),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
               decoration: BoxDecoration(
@@ -1271,6 +1267,8 @@ class _DailyProgressScreenState extends ConsumerState<DailyProgressScreen> {
                     scan.foodName.isNotEmpty
                         ? '${scan.foodName[0].toUpperCase()}${scan.foodName.substring(1)}'
                         : 'Món ăn',
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
                       fontSize: 15,
                       fontWeight: FontWeight.bold,
@@ -1310,6 +1308,7 @@ class _DailyProgressScreenState extends ConsumerState<DailyProgressScreen> {
                 ],
               ),
             ),
+            const SizedBox(width: 10),
             Column(
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [

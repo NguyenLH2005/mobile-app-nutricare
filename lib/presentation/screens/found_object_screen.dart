@@ -471,13 +471,22 @@ class _FoundObjectScreenState extends ConsumerState<FoundObjectScreen> {
                         Icon(Icons.restaurant_menu, color: Colors.green.shade700, size: 22),
                         const SizedBox(width: 8),
                         Expanded(
-                          child: Text(
-                            'Chọn Phần / Loại: $displayLabel',
-                            style: const TextStyle(
-                              fontSize: 17,
-                              fontWeight: FontWeight.bold,
-                              color: Color(0xFF1B233A),
-                            ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Chọn phần: $displayLabel',
+                                style: const TextStyle(
+                                  fontSize: 17,
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFF1B233A),
+                                ),
+                              ),
+                              Text(
+                                'Giá trị tính trên 100g phần ăn được',
+                                style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                              ),
+                            ],
                           ),
                         ),
                         IconButton(
@@ -485,11 +494,6 @@ class _FoundObjectScreenState extends ConsumerState<FoundObjectScreen> {
                           onPressed: () => Navigator.pop(bottomSheetContext),
                         ),
                       ],
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Chọn đúng phần thực phẩm bạn đang dùng để hệ thống tính calo, dinh dưỡng và cách chế biến chính xác (phần phổ biến được đặt lên đầu):',
-                      style: TextStyle(fontSize: 13, color: Colors.grey.shade600, height: 1.35),
                     ),
                     const SizedBox(height: 12),
                     Flexible(
@@ -503,10 +507,12 @@ class _FoundObjectScreenState extends ConsumerState<FoundObjectScreen> {
                           final cookRows = repo.getCookingRowsForPart(displayLabel, part);
                           final prefRow = cookRows.isNotEmpty ? cookRows.first : null;
                           final kcalVal = double.tryParse(prefRow?['Năng lượng']?.toString() ?? '') ?? 0.0;
-                          final methodsText = cookRows
-                              .map((r) => r['cooking_method']?.toString().trim() ?? '')
-                              .where((m) => m.isNotEmpty)
-                              .join(' • ');
+                          final methodsText = cookRows.length >= 2
+                              ? cookRows
+                                  .map((r) => r['cooking_method']?.toString().trim() ?? '')
+                                  .where((m) => m.isNotEmpty)
+                                  .join(' · ')
+                              : '';
 
                           return InkWell(
                             onTap: () {
@@ -517,7 +523,7 @@ class _FoundObjectScreenState extends ConsumerState<FoundObjectScreen> {
                             borderRadius: BorderRadius.circular(12),
                             child: Container(
                               margin: const EdgeInsets.only(bottom: 8),
-                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                               decoration: BoxDecoration(
                                 color: isSelected
                                     ? Colors.green.shade50.withValues(alpha: 0.7)
@@ -535,7 +541,7 @@ class _FoundObjectScreenState extends ConsumerState<FoundObjectScreen> {
                                     color: isSelected ? Colors.green.shade700 : Colors.grey.shade400,
                                     size: 20,
                                   ),
-                                  const SizedBox(width: 12),
+                                  const SizedBox(width: 10),
                                   Expanded(
                                     child: Column(
                                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -545,8 +551,10 @@ class _FoundObjectScreenState extends ConsumerState<FoundObjectScreen> {
                                             Flexible(
                                               child: Text(
                                                 part,
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
                                                 style: TextStyle(
-                                                  fontSize: 15,
+                                                  fontSize: 14.5,
                                                   fontWeight: FontWeight.bold,
                                                   color: isSelected
                                                       ? Colors.green.shade900
@@ -557,7 +565,7 @@ class _FoundObjectScreenState extends ConsumerState<FoundObjectScreen> {
                                             if (isDefault) ...[
                                               const SizedBox(width: 6),
                                               Container(
-                                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
                                                 decoration: BoxDecoration(
                                                   color: Colors.amber.shade50,
                                                   borderRadius: BorderRadius.circular(4),
@@ -576,9 +584,9 @@ class _FoundObjectScreenState extends ConsumerState<FoundObjectScreen> {
                                           ],
                                         ),
                                         if (methodsText.isNotEmpty) ...[
-                                          const SizedBox(height: 3),
+                                          const SizedBox(height: 2),
                                           Text(
-                                            'Chế biến: $methodsText',
+                                            methodsText,
                                             style: TextStyle(fontSize: 11.5, color: Colors.grey.shade600),
                                           ),
                                         ],
@@ -593,9 +601,9 @@ class _FoundObjectScreenState extends ConsumerState<FoundObjectScreen> {
                                       borderRadius: BorderRadius.circular(8),
                                     ),
                                     child: Text(
-                                      '${kcalVal.toStringAsFixed(0)} kcal/100g',
+                                      '${kcalVal.toStringAsFixed(0)} kcal',
                                       style: TextStyle(
-                                        fontSize: 11.5,
+                                        fontSize: 12,
                                         fontWeight: FontWeight.bold,
                                         color: isSelected ? Colors.green.shade800 : Colors.grey.shade700,
                                       ),
@@ -905,39 +913,61 @@ class _FoundObjectScreenState extends ConsumerState<FoundObjectScreen> {
 
   Widget _buildRatioChip(double ratio, String label) {
     final bool isSelected = (_currentData.consumptionRatio - ratio).abs() < 0.02;
-    return ChoiceChip(
-      label: Text(label),
-      selected: isSelected,
-      selectedColor: Colors.green.shade100,
-      labelStyle: TextStyle(
-        fontSize: 12,
-        fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-        color: isSelected ? Colors.green.shade900 : Colors.black87,
+    return Expanded(
+      child: InkWell(
+        onTap: () => _setConsumptionRatio(isSelected ? 1.0 : ratio),
+        borderRadius: BorderRadius.circular(8),
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: isSelected ? Colors.green.shade100 : Colors.grey.shade50,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(
+              color: isSelected ? Colors.green.shade600 : Colors.grey.shade300,
+              width: isSelected ? 1.4 : 1.0,
+            ),
+          ),
+          child: Text(
+            label,
+            style: TextStyle(
+              fontSize: 12.5,
+              fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+              color: isSelected ? Colors.green.shade900 : Colors.black87,
+            ),
+          ),
+        ),
       ),
-      onSelected: (selected) {
-        if (selected) {
-          _setConsumptionRatio(ratio);
-        } else {
-          _setConsumptionRatio(1.0);
-        }
-      },
     );
   }
 
   Widget _buildCustomRatioChip() {
     final bool isStandard = [0.25, 0.50, 0.75, 1.0].any((r) => (_currentData.consumptionRatio - r).abs() < 0.02);
-    return ActionChip(
-      avatar: const Icon(Icons.edit, size: 14, color: Colors.blue),
-      label: Text(
-        isStandard ? 'Tùy chỉnh...' : '${(_currentData.consumptionRatio * 100).round()}%',
-        style: TextStyle(
-          fontSize: 12,
-          fontWeight: isStandard ? FontWeight.normal : FontWeight.bold,
-          color: Colors.blue.shade900,
+    return Expanded(
+      child: InkWell(
+        onTap: _showCustomRatioDialog,
+        borderRadius: BorderRadius.circular(8),
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: isStandard ? Colors.blue.shade50 : Colors.blue.shade100,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(
+              color: isStandard ? Colors.blue.shade200 : Colors.blue.shade500,
+              width: isStandard ? 1.0 : 1.4,
+            ),
+          ),
+          child: Text(
+            isStandard ? 'Khác' : '${(_currentData.consumptionRatio * 100).round()}%',
+            style: TextStyle(
+              fontSize: 12.5,
+              fontWeight: isStandard ? FontWeight.w600 : FontWeight.bold,
+              color: Colors.blue.shade900,
+            ),
+          ),
         ),
       ),
-      backgroundColor: isStandard ? Colors.blue.shade50 : Colors.blue.shade100,
-      onPressed: _showCustomRatioDialog,
     );
   }
 
@@ -1127,9 +1157,7 @@ class _FoundObjectScreenState extends ConsumerState<FoundObjectScreen> {
         currentCsvRow?['cooking_method']?.toString().trim() ?? 'Tươi';
     final List<Map<String, dynamic>> cookingRows =
         _isEggFood ? const [] : foodRepo.getCookingRowsForPart(displayLabel, currentPartName);
-    final bool showCookingCard = !_isEggFood &&
-        (cookingRows.length >= 2 ||
-            (hasMultipleParts && foodRepo.hasAnyCookingVariation(displayLabel)));
+    final bool showCookingCard = !_isEggFood && cookingRows.length >= 2;
 
     final servingUnits = foodRepo.calculateAllServingUnits(
       mainGroup: _currentData.mainGroup,
@@ -1230,42 +1258,44 @@ class _FoundObjectScreenState extends ConsumerState<FoundObjectScreen> {
                       ],
                     ),
                     if (_isEggFood) ...[
-                      const SizedBox(height: 12),
-                      SizedBox(
-                        width: double.infinity,
-                        child: ElevatedButton.icon(
+                      const SizedBox(height: 10),
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: OutlinedButton.icon(
                           onPressed: () => _showEggSelectionModal(),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.amber.shade700,
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                            elevation: 0,
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: Colors.amber.shade900,
+                            backgroundColor: Colors.amber.shade50,
+                            side: BorderSide(color: Colors.amber.shade300),
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                            visualDensity: VisualDensity.compact,
                           ),
-                          icon: const Icon(Icons.egg_rounded, size: 18),
+                          icon: const Icon(Icons.egg_rounded, size: 16),
                           label: Text(
-                            'Loại: ${_matchedEggOption.displayName} (~${_matchedEggOption.weightPerUnit.toInt()}g/quả)',
-                            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+                            'Đổi loại trứng (~${_matchedEggOption.weightPerUnit.toInt()}g/quả)',
+                            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
                           ),
                         ),
                       ),
                     ] else if (hasMultipleParts) ...[
-                      const SizedBox(height: 12),
-                      SizedBox(
-                        width: double.infinity,
-                        child: ElevatedButton.icon(
+                      const SizedBox(height: 10),
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: OutlinedButton.icon(
                           onPressed: () => _showPartSelectionModal(),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.teal.shade700,
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                            elevation: 0,
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: Colors.teal.shade800,
+                            backgroundColor: Colors.teal.shade50,
+                            side: BorderSide(color: Colors.teal.shade200),
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                            visualDensity: VisualDensity.compact,
                           ),
-                          icon: const Icon(Icons.tune, size: 18),
-                          label: Text(
-                            'Phần: ${currentPartName.isNotEmpty ? currentPartName : "Mặc định"} • Nhấn để đổi',
-                            style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.bold),
+                          icon: const Icon(Icons.swap_horiz, size: 16),
+                          label: const Text(
+                            'Đổi phần / loại khác',
+                            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
                           ),
                         ),
                       ),
@@ -1275,9 +1305,9 @@ class _FoundObjectScreenState extends ConsumerState<FoundObjectScreen> {
               ),
               const SizedBox(height: 12),
 
-              // 2.1. ĐƠN VỊ KHẨU PHẦN CHUẨN (Hiển thị tất cả quy đổi từ CSV, chỉ 1 dòng gọn gàng)
+              // 2.1. ĐƠN VỊ KHẨU PHẦN CHUẨN (gọn trên 1 dòng mỗi nhóm)
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                 decoration: BoxDecoration(
                   color: const Color(0xFFF0FDF4),
                   borderRadius: BorderRadius.circular(12),
@@ -1287,24 +1317,24 @@ class _FoundObjectScreenState extends ConsumerState<FoundObjectScreen> {
                   crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
                     Container(
-                      padding: const EdgeInsets.all(8),
+                      padding: const EdgeInsets.all(7),
                       decoration: BoxDecoration(
                         color: Colors.green.shade100,
                         shape: BoxShape.circle,
                       ),
-                      child: const Icon(Icons.scale_outlined, color: Colors.green, size: 20),
+                      child: const Icon(Icons.scale_outlined, color: Colors.green, size: 18),
                     ),
-                    const SizedBox(width: 12),
+                    const SizedBox(width: 10),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: servingUnits.map((su) => Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 2.5),
+                          padding: const EdgeInsets.symmetric(vertical: 2),
                           child: Text(
-                            su.singleLineText,
+                            '≈ ${su.servingCount.toStringAsFixed(1)} phần ${su.groupShortName} (1 phần = ${su.servingWeight.toStringAsFixed(0)}g)',
                             style: TextStyle(
-                              fontSize: 13.5,
-                              fontWeight: FontWeight.bold,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
                               color: Colors.green.shade900,
                             ),
                           ),
@@ -1316,7 +1346,7 @@ class _FoundObjectScreenState extends ConsumerState<FoundObjectScreen> {
               ),
               const SizedBox(height: 12),
 
-              // 2.15. PHƯƠNG PHÁP CHẾ BIẾN (các ô bấm đổi màu, đặt ngay trên mục Khẩu phần ăn thực tế)
+              // 2.15. PHƯƠNG PHÁP CHẾ BIẾN (chỉ hiện khi phần đang chọn có >= 2 cách chế biến)
               if (showCookingCard && cookingRows.isNotEmpty) ...[
                 Container(
                   width: double.infinity,
@@ -1363,7 +1393,7 @@ class _FoundObjectScreenState extends ConsumerState<FoundObjectScreen> {
                             borderRadius: BorderRadius.circular(10),
                             child: AnimatedContainer(
                               duration: const Duration(milliseconds: 160),
-                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
                               decoration: BoxDecoration(
                                 color: isSelected ? Colors.green.shade100 : Colors.grey.shade100,
                                 borderRadius: BorderRadius.circular(10),
@@ -1385,7 +1415,7 @@ class _FoundObjectScreenState extends ConsumerState<FoundObjectScreen> {
                                     ),
                                   ),
                                   Text(
-                                    '${kcalVal.toStringAsFixed(0)} kcal/100g',
+                                    '${kcalVal.toStringAsFixed(0)} kcal',
                                     style: TextStyle(
                                       fontSize: 11,
                                       color: isSelected ? Colors.green.shade800 : Colors.grey.shade600,
@@ -1397,13 +1427,6 @@ class _FoundObjectScreenState extends ConsumerState<FoundObjectScreen> {
                           );
                         }).toList(),
                       ),
-                      if (cookingRows.length == 1) ...[
-                        const SizedBox(height: 8),
-                        Text(
-                          'Phần này hiện chỉ có dữ liệu chế biến: ${cookingRows.first['cooking_method']}.',
-                          style: TextStyle(fontSize: 11.5, color: Colors.grey.shade600, fontStyle: FontStyle.italic),
-                        ),
-                      ],
                     ],
                   ),
                 ),
@@ -1511,15 +1534,17 @@ class _FoundObjectScreenState extends ConsumerState<FoundObjectScreen> {
                         style: TextStyle(fontSize: 12, color: Colors.grey.shade700, fontWeight: FontWeight.w500),
                       ),
                     ] else ...[
-                      // Các nút chọn phần trăm gọn gàng (không phân số)
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 6,
+                      // Các nút chọn phần trăm gọn trên 1 hàng
+                      Row(
                         children: [
                           _buildRatioChip(0.25, '25%'),
+                          const SizedBox(width: 6),
                           _buildRatioChip(0.50, '50%'),
+                          const SizedBox(width: 6),
                           _buildRatioChip(0.75, '75%'),
+                          const SizedBox(width: 6),
                           _buildRatioChip(1.00, '100%'),
+                          const SizedBox(width: 6),
                           _buildCustomRatioChip(),
                         ],
                       ),
