@@ -5,7 +5,8 @@ import '../../data/models/scan_history_model.dart';
 import '../../data/models/user_profile_model.dart';
 import '../../data/datasources/local/database_helper.dart';
 import '../state/profile_controller.dart';
-import '../state/history_controller.dart';
+import '../state/scan_controller.dart';
+import '../state/sync_controller.dart';
 import 'found_object_screen.dart';
 import 'edit_profile_screen.dart';
 
@@ -22,6 +23,7 @@ class _DailyProgressScreenState extends ConsumerState<DailyProgressScreen> {
   late DateTime _selectedDate;
   List<ScanHistory> _dailyScans = [];
   bool _isLoading = true;
+  bool _showAllMicronutrients = false;
 
   @override
   void initState() {
@@ -110,14 +112,17 @@ class _DailyProgressScreenState extends ConsumerState<DailyProgressScreen> {
     double totalFiber = 0;
     double totalSodium = 0;
     double totalSugar = 0;
+    double totalPotassium = 0;
+    double totalPhosphorus = 0;
+    double totalSatFat = 0;
 
     for (final scan in _dailyScans) {
       final actualRatio = scan.actualWeight / 100.0;
       final nutritionList = scan.decodedNutrition;
 
       for (final item in nutritionList) {
-        final id = (item['id'] ?? '').toString().toLowerCase();
-        final name = (item['name'] ?? '').toString().toLowerCase();
+        final id = (item['id'] ?? '').toString().toLowerCase().trim();
+        final name = (item['name'] ?? '').toString().toLowerCase().trim();
         final p100 = (item['per_100g'] as num?)?.toDouble() ?? 0.0;
         final actualVal = p100 * actualRatio;
 
@@ -127,13 +132,21 @@ class _DailyProgressScreenState extends ConsumerState<DailyProgressScreen> {
           totalProtein += actualVal;
         } else if (id == 'carb' || name.contains('chất bột đường') || name.contains('glucid')) {
           totalCarb += actualVal;
-        } else if (id == 'total_fat' || name.contains('chất béo') || name.contains('lipid')) {
+        } else if (id == 'saturated_fat' ||
+            id == 'axit béo bão hòa tổng số' ||
+            (name.contains('bão hòa') && !name.contains('không bão hòa'))) {
+          totalSatFat += actualVal;
+        } else if (id == 'total_fat' || id == 'fat' || name.contains('chất béo') || name.contains('lipid')) {
           totalFat += actualVal;
         } else if (id == 'fiber' || name.contains('chất xơ')) {
           totalFiber += actualVal;
-        } else if (id == 'sodium' || name.contains('natri')) {
+        } else if (id == 'sodium' || id == 'natri' || name.contains('natri')) {
           totalSodium += actualVal;
-        } else if (id == 'sugars' || name.contains('đường')) {
+        } else if (id == 'kali' || id == 'potassium' || name == 'kali' || name.contains('kali (')) {
+          totalPotassium += actualVal;
+        } else if (id == 'photpho' || id == 'phosphorus' || name == 'photpho' || name.contains('photpho')) {
+          totalPhosphorus += actualVal;
+        } else if (id == 'sugars' || id == 'sugars, total' || id.contains('sugars') || name.contains('đường')) {
           totalSugar += actualVal;
         }
       }
@@ -147,6 +160,9 @@ class _DailyProgressScreenState extends ConsumerState<DailyProgressScreen> {
       'fiber': totalFiber,
       'sodium': totalSodium,
       'sugar': totalSugar,
+      'potassium': totalPotassium,
+      'phosphorus': totalPhosphorus,
+      'satFat': totalSatFat,
     };
   }
 
@@ -227,6 +243,10 @@ class _DailyProgressScreenState extends ConsumerState<DailyProgressScreen> {
                         targetFat: targetFat,
                         targetFiber: targetFiber,
                       ),
+                      const SizedBox(height: 14),
+
+                      // 3B. NGƯỠNG Y KHOA & VI CHẤT (NATRI, KALI, PHOTPHO...)
+                      _buildMicroAndCeilingsCard(profile, intake),
                       const SizedBox(height: 14),
 
                       // 4. MA TRẬN BÙ ĐẮP KHẨU PHẦN CHUẨN (N_equiv)
@@ -591,6 +611,296 @@ class _DailyProgressScreenState extends ConsumerState<DailyProgressScreen> {
     );
   }
 
+  // --- 3B. NGƯỠNG Y KHOA & VI CHẤT (NATRI, KALI, PHOTPHO...) ---
+  Widget _buildMicroAndCeilingsCard(UserProfile profile, Map<String, double> intake) {
+    final flags = profile.medicalFlags;
+    final bool hasDiabetes = flags.isNotEmpty && flags[0] == '1';
+    final bool hasHypertension = flags.length > 1 && flags[1] == '1';
+    final bool hasLipid = flags.length > 2 && flags[2] == '1';
+    final bool hasKidney = profile.ceilingProteinKidney > 0;
+    final bool hasCardio = flags.length > 5 && flags[5] == '1';
+
+    final List<Widget> primaryRows = [
+      _buildMicroProgressRow(
+        label: 'Natri (Muối)',
+        current: intake['sodium'] ?? 0.0,
+        maxLimit: profile.ceilingSodium > 0 ? profile.ceilingSodium : 2000.0,
+        unit: 'mg',
+        decimals: 0,
+        isUpperLimit: true,
+        accentColor: Colors.teal,
+        subtitle: (hasHypertension || hasCardio)
+            ? 'Trần bệnh Tăng huyết áp / Tim mạch'
+            : 'Trần an toàn WHO',
+      ),
+      _buildMicroProgressRow(
+        label: 'Kali (Potassium)',
+        current: intake['potassium'] ?? 0.0,
+        minTarget: hasKidney ? null : 3500.0,
+        maxLimit: hasKidney ? 2000.0 : 4700.0,
+        unit: 'mg',
+        decimals: 0,
+        isUpperLimit: hasKidney,
+        accentColor: Colors.indigo,
+        subtitle: hasKidney
+            ? 'Trần bệnh Thận mạn (<= 2000 mg)'
+            : 'Mức khuyến nghị 3500 - 4700 mg/ngày',
+      ),
+      _buildMicroProgressRow(
+        label: 'Photpho (Phosphorus)',
+        current: intake['phosphorus'] ?? 0.0,
+        minTarget: hasKidney ? null : 700.0,
+        maxLimit: hasKidney ? 800.0 : 1000.0,
+        unit: 'mg',
+        decimals: 0,
+        isUpperLimit: hasKidney,
+        accentColor: Colors.deepPurple,
+        subtitle: hasKidney
+            ? 'Trần bệnh Thận mạn (<= 800 mg)'
+            : 'Mức khuyến nghị 700 - 1000 mg/ngày',
+      ),
+    ];
+
+    final List<Widget> extraRows = [];
+
+    final sugarRow = _buildMicroProgressRow(
+      label: 'Đường tự do (Sugars)',
+      current: intake['sugar'] ?? 0.0,
+      maxLimit: profile.ceilingSugar > 0 ? profile.ceilingSugar : 25.0,
+      unit: 'g',
+      decimals: 1,
+      isUpperLimit: true,
+      accentColor: Colors.amber.shade800,
+      subtitle: (hasDiabetes || profile.isObesityMode)
+          ? 'Trần Tiểu đường / Béo phì (<= 5% calo)'
+          : 'Trần khuyến nghị WHO',
+    );
+    if (hasDiabetes || profile.isObesityMode) {
+      primaryRows.add(sugarRow);
+    } else {
+      extraRows.add(sugarRow);
+    }
+
+    final satFatRow = _buildMicroProgressRow(
+      label: 'Chất béo bão hòa',
+      current: intake['satFat'] ?? 0.0,
+      maxLimit: profile.ceilingSatFat > 0 ? profile.ceilingSatFat : 20.0,
+      unit: 'g',
+      decimals: 1,
+      isUpperLimit: true,
+      accentColor: Colors.brown,
+      subtitle: hasLipid
+          ? 'Trần Rối loạn lipid máu (< 7% calo)'
+          : 'Trần khuyến nghị (< 10% calo)',
+    );
+    if (hasLipid) {
+      primaryRows.add(satFatRow);
+    } else {
+      extraRows.add(satFatRow);
+    }
+
+    if (hasKidney && profile.ceilingProteinKidney > 0) {
+      primaryRows.add(
+        _buildMicroProgressRow(
+          label: 'Trần đạm KDIGO (Thận)',
+          current: intake['protein'] ?? 0.0,
+          maxLimit: profile.ceilingProteinKidney,
+          unit: 'g',
+          decimals: 1,
+          isUpperLimit: true,
+          accentColor: Colors.deepOrange,
+          subtitle: 'Giới hạn 0.8g đạm/kg cho bệnh Thận mạn',
+        ),
+      );
+    }
+
+    final visibleRows = _showAllMicronutrients
+        ? [...primaryRows, ...extraRows]
+        : primaryRows;
+
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.monitor_heart_outlined, color: Colors.teal, size: 20),
+              const SizedBox(width: 8),
+              const Expanded(
+                child: Text(
+                  'Ngưỡng Y Khoa & Vi Chất Ngày',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF1B233A)),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          for (int i = 0; i < visibleRows.length; i++) ...[
+            if (i > 0) const Divider(height: 20),
+            visibleRows[i],
+          ],
+          if (extraRows.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            Center(
+              child: TextButton.icon(
+                onPressed: () {
+                  setState(() {
+                    _showAllMicronutrients = !_showAllMicronutrients;
+                  });
+                },
+                icon: Icon(
+                  _showAllMicronutrients ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
+                  size: 18,
+                  color: Colors.teal.shade700,
+                ),
+                label: Text(
+                  _showAllMicronutrients
+                      ? 'Thu gọn chỉ số phụ'
+                      : 'Xem thêm ${extraRows.length} chỉ số (Đường, Béo bão hòa)',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.teal.shade700,
+                  ),
+                ),
+              ),
+            ),
+          ],
+          if (_showAllMicronutrients || hasDiabetes || profile.isObesityMode || hasLipid)
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Text(
+                '* Lưu ý: Đường tổng số & chất béo bão hòa tính theo các thực phẩm có công bố dữ liệu trong bảng thành phần.',
+                style: TextStyle(fontSize: 11, color: Colors.grey.shade600, fontStyle: FontStyle.italic),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMicroProgressRow({
+    required String label,
+    required double current,
+    double? minTarget,
+    required double maxLimit,
+    required String unit,
+    required int decimals,
+    required bool isUpperLimit,
+    required Color accentColor,
+    required String subtitle,
+  }) {
+    final String curStr = current.toStringAsFixed(decimals);
+    final String targetStr = (!isUpperLimit && minTarget != null)
+        ? '${minTarget.toStringAsFixed(decimals)}-${maxLimit.toStringAsFixed(decimals)} $unit'
+        : '<= ${maxLimit.toStringAsFixed(decimals)} $unit';
+
+    final double progressRatio;
+    final Color barColor;
+    final String statusText;
+
+    if (isUpperLimit) {
+      progressRatio = maxLimit > 0 ? (current / maxLimit).clamp(0.0, 1.0) : 0.0;
+      if (current > maxLimit) {
+        barColor = Colors.red;
+        statusText = 'Vượt trần';
+      } else if (maxLimit > 0 && current / maxLimit >= 0.85) {
+        barColor = Colors.orange.shade800;
+        statusText = 'Sắp chạm trần';
+      } else {
+        barColor = accentColor;
+        statusText = 'Trong ngưỡng';
+      }
+    } else {
+      final double refTarget = (minTarget != null && minTarget > 0) ? minTarget : maxLimit;
+      progressRatio = refTarget > 0 ? (current / refTarget).clamp(0.0, 1.0) : 0.0;
+      if (minTarget != null && current < minTarget) {
+        barColor = accentColor;
+        statusText = 'Chưa đủ';
+      } else if (current <= maxLimit) {
+        barColor = Colors.green;
+        statusText = 'Đạt chuẩn';
+      } else {
+        barColor = Colors.amber.shade800;
+        statusText = 'Cao hơn khuyến nghị';
+      }
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Expanded(
+              child: Text(
+                label,
+                style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+              ),
+            ),
+            Text(
+              '$curStr / $targetStr',
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 13,
+                color: barColor,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 3),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Expanded(
+              child: Text(
+                subtitle,
+                style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+              ),
+            ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              decoration: BoxDecoration(
+                color: barColor.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(4),
+              ),
+              child: Text(
+                statusText,
+                style: TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.bold,
+                  color: barColor,
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 6),
+        ClipRRect(
+          borderRadius: BorderRadius.circular(4),
+          child: LinearProgressIndicator(
+            value: progressRatio,
+            minHeight: 7,
+            backgroundColor: Colors.grey.shade200,
+            valueColor: AlwaysStoppedAnimation<Color>(barColor),
+          ),
+        ),
+      ],
+    );
+  }
+
   // --- 4. MA TRẬN BÙ ĐẮP KHẨU PHẦN CHUẨN (N_equiv - Công thức 2.15) ---
   Widget _buildEquivSupplementCard({
     required double equivProtein,
@@ -738,13 +1048,39 @@ class _DailyProgressScreenState extends ConsumerState<DailyProgressScreen> {
       ));
     }
 
-    // Cảnh báo Bệnh Thận (KDIGO 2024)
-    final bool hasKidney = profile.medicalFlags.length > 4 && profile.medicalFlags[4] == '1';
+    // Cảnh báo Bệnh Thận (KDIGO 2024: Đạm, Kali, Photpho)
+    final bool hasKidney = profile.ceilingProteinKidney > 0 ||
+        (profile.medicalFlags.length > 4 && profile.medicalFlags[4] == '1');
     if (hasKidney && intake['protein']! > profile.ceilingProteinKidney && profile.ceilingProteinKidney > 0) {
       alerts.add(_buildAlertBanner(
         title: 'CẢNH BÁO KDIGO: Vượt trần đạm bệnh Thận: ${intake['protein']!.toStringAsFixed(1)} / ${profile.ceilingProteinKidney.toStringAsFixed(1)} g',
         desc: 'Khuyến cáo KDIGO giới hạn 0.8g đạm/kg để tránh tăng áp lực lọc cầu thận. Vui lòng giảm lượng thịt, cá, trứng trong các bữa tiếp theo.',
         color: Colors.deepOrange,
+      ));
+    }
+
+    if (hasKidney && (intake['potassium'] ?? 0.0) > 2000.0) {
+      alerts.add(_buildAlertBanner(
+        title: 'CẢNH BÁO THẬN: Vượt trần Kali: ${intake['potassium']!.toStringAsFixed(0)} / 2000 mg',
+        desc: 'Người bệnh Thận mạn giảm khả năng bài tiết Kali. Hãy hạn chế chuối, cam, rau xanh đậm và nước hầm xương trong các bữa còn lại.',
+        color: Colors.red,
+      ));
+    }
+
+    if (hasKidney && (intake['phosphorus'] ?? 0.0) > 800.0) {
+      alerts.add(_buildAlertBanner(
+        title: 'CẢNH BÁO THẬN: Vượt trần Photpho: ${intake['phosphorus']!.toStringAsFixed(0)} / 800 mg',
+        desc: 'Lượng Photpho đã vượt trần 800 mg/ngày. Hãy tránh nội tạng, hải sản vỏ cứng, hạt khô và đồ uống có ga.',
+        color: Colors.deepPurple,
+      ));
+    }
+
+    final bool hasLipid = profile.medicalFlags.length > 2 && profile.medicalFlags[2] == '1';
+    if (hasLipid && (intake['satFat'] ?? 0.0) > profile.ceilingSatFat && profile.ceilingSatFat > 0) {
+      alerts.add(_buildAlertBanner(
+        title: 'CẢNH BÁO: Vượt trần Chất béo bão hòa: ${intake['satFat']!.toStringAsFixed(1)} / ${profile.ceilingSatFat.toStringAsFixed(1)} g',
+        desc: 'Lượng chất béo bão hòa vượt ngưỡng kiểm soát mỡ máu. Hãy tránh mỡ động vật, đồ chiên rán và chọn thịt nạc/cá hấp.',
+        color: Colors.brown,
       ));
     }
 
@@ -986,9 +1322,9 @@ class _DailyProgressScreenState extends ConsumerState<DailyProgressScreen> {
                   ),
                 ),
                 IconButton(
-                  icon: const Icon(Icons.delete_outline, color: Colors.grey, size: 20),
+                  icon: const Icon(Icons.remove_circle_outline, color: Colors.grey, size: 20),
                   onPressed: () => _confirmDeleteScan(scan),
-                  tooltip: 'Xóa món',
+                  tooltip: 'Gỡ khỏi thực đơn ngày',
                 ),
               ],
             ),
@@ -1002,21 +1338,28 @@ class _DailyProgressScreenState extends ConsumerState<DailyProgressScreen> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Xác nhận xóa'),
-        content: Text('Bạn có chắc muốn xóa món "${scan.foodName}" khỏi nhật ký ngày này?'),
+        title: const Text('Gỡ khỏi thực đơn ngày'),
+        content: Text('Bạn có muốn gỡ món "${scan.foodName}" khỏi thực đơn ngày này không? Thẻ vẫn được giữ lại trong Lịch sử tra cứu.'),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Hủy')),
           TextButton(
             onPressed: () => Navigator.pop(ctx, true),
             style: TextButton.styleFrom(foregroundColor: Colors.red),
-            child: const Text('Xóa'),
+            child: const Text('Gỡ món'),
           ),
         ],
       ),
     );
 
     if (confirmed == true) {
-      await ref.read(historyControllerProvider.notifier).deleteRecords([scan]);
+      final updated = scan.copyWith(
+        isInMenu: false,
+        isSynced: 0,
+        updatedAt: DateTime.now(),
+      );
+      await DatabaseHelper.instance.updateScan(updated);
+      ref.invalidate(historyProvider);
+      ref.read(syncProvider.notifier).syncNow();
       _loadDailyScans();
     }
   }

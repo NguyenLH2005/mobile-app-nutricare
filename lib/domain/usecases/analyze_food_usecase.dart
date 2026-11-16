@@ -62,6 +62,10 @@ class AnalyzeFoodUseCase {
         throw Exception("Không tìm thấy '$detectedName' trong cơ sở dữ liệu!");
       }
 
+      final String displayFoodName = repository.formatDisplayName(
+        foodData,
+        overrideLabel: isEgg ? null : detectedName,
+      );
       final String mainGroup = foodData['Nhóm Dinh Dưỡng Chính']?.toString().trim() ?? 'Chưa phân loại';
 
       // 3. TÍNH TOÁN & ĐÓNG GÓI JSON
@@ -102,7 +106,7 @@ class AnalyzeFoodUseCase {
         originalImageBase64: originalBase64,
         foodImageBase64: foodBase64,
         labelImageBase64: labelBase64,
-        foodName: detectedName,
+        foodName: displayFoodName,
         weight: detectedWeightInGrams,
         servingUnits: servingInfo.servingCount,
         consumptionRatio: 1.0,

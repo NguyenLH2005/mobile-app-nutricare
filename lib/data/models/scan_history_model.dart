@@ -16,6 +16,7 @@ class ScanHistory {
   final double? servingUnits; // Số đơn vị khẩu phần chuẩn quy đổi (S_j)
   final double consumptionRatio; // Hệ số tiêu thụ gamma (mặc định 1.0)
   final String? logDate; // Ngày tiêu thụ dạng YYYY-MM-DD
+  final bool isInMenu; // Đã thêm vào thực đơn/tiến độ ngày hay chỉ lưu lịch sử tra cứu
   final String nutritionData;
   final String mainGroup; // Nhóm dinh dưỡng chính (từ CSV)
   final DateTime createdAt;
@@ -36,6 +37,7 @@ class ScanHistory {
     this.servingUnits,
     this.consumptionRatio = 1.0,
     this.logDate,
+    this.isInMenu = false,
     required this.nutritionData,
     required this.mainGroup,
     required this.createdAt,
@@ -62,6 +64,7 @@ class ScanHistory {
       'serving_units': servingUnits,
       'consumption_ratio': consumptionRatio,
       'log_date': effectiveDate,
+      'is_in_menu': isInMenu ? 1 : 0,
       'nutrition_data': nutritionData,
       'main_group': mainGroup,
       'created_at': createdAt.toIso8601String(),
@@ -92,6 +95,7 @@ class ScanHistory {
       servingUnits: map['serving_units'] != null ? (map['serving_units'] as num).toDouble() : null,
       consumptionRatio: map['consumption_ratio'] != null ? (map['consumption_ratio'] as num).toDouble() : 1.0,
       logDate: map['log_date'] ?? created.toIso8601String().substring(0, 10),
+      isInMenu: map['is_in_menu'] == 1 || map['is_in_menu'] == true,
       nutritionData: map['nutrition_data'] ?? '[]',
       mainGroup: map['main_group'] ?? 'Chưa phân loại',
       createdAt: created,
@@ -114,6 +118,7 @@ class ScanHistory {
     double? servingUnits,
     double? consumptionRatio,
     String? logDate,
+    bool? isInMenu,
     String? nutritionData,
     String? mainGroup,
     DateTime? createdAt,
@@ -134,6 +139,7 @@ class ScanHistory {
       servingUnits: servingUnits ?? this.servingUnits,
       consumptionRatio: consumptionRatio ?? this.consumptionRatio,
       logDate: logDate ?? this.logDate,
+      isInMenu: isInMenu ?? this.isInMenu,
       nutritionData: nutritionData ?? this.nutritionData,
       mainGroup: mainGroup ?? this.mainGroup,
       createdAt: createdAt ?? this.createdAt,

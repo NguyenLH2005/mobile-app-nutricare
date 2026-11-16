@@ -6,27 +6,41 @@ class FoodRepository {
   // Biến lưu trữ dữ liệu CSV trên RAM dạng Map để tra cứu
   // Key: tên món ăn đã chuẩn hóa, Value: dữ liệu 1 dòng của món đó
   final Map<String, List<dynamic>> _foodData = {};
+  final List<Map<String, dynamic>> _allRows = [];
+  final Map<String, List<Map<String, dynamic>>> _rowsByLabel = {};
   List<String> _headers = [];
 
   // Hàm đọc file CSV (chỉ gọi 1 lần khi khởi động app)
   Future<void> loadCsvData() async {
     try {
       final rawData = await rootBundle.loadString(
-        'assets/db/gia_tri_dinh_duong_thuc_pham.csv',
+        'assets/db/gia_tri_dinh_duong_thuc_pham_chi_tiet.csv',
       );
       
       List<List<dynamic>> rowsAsListOfValues = Csv().decode(rawData);
 
+      _foodData.clear();
+      _allRows.clear();
+      _rowsByLabel.clear();
+
       if (rowsAsListOfValues.isNotEmpty) {
-        _headers = rowsAsListOfValues.first.map((e) => e.toString()).toList(); // Lấy dòng đầu làm tiêu đề
+        _headers = rowsAsListOfValues.first.map((e) => e.toString().trim()).toList(); // Lấy dòng đầu làm tiêu đề
 
         for (int i = 1; i < rowsAsListOfValues.length; i++) {
           final row = rowsAsListOfValues[i];
           if (row.length > 1) {
-            // Giả sử cột index 1 là Tên món ăn (name_vi)
             final String rawName = row[1].toString();
             final String normalizedName = _normalizeString(rawName);
             _foodData[normalizedName] = row;
+
+            if (row.length == _headers.length) {
+              final rowMap = Map<String, dynamic>.fromIterables(_headers, row);
+              _allRows.add(rowMap);
+              final labelKey = _normalizeString(rowMap['food_label']?.toString() ?? '');
+              if (labelKey.isNotEmpty) {
+                _rowsByLabel.putIfAbsent(labelKey, () => []).add(rowMap);
+              }
+            }
           }
         }
       }
@@ -79,8 +93,8 @@ class FoodRepository {
     'Súp lơ': 'súp lơ xanh, tươi',
     'Táo': 'táo tây, tươi',
     'Thanh long': 'quả thanh long, tươi',
-    'Thịt bò': 'thịt bò, bắp, sống',
-    'Thịt gà': 'thịt gà ta, tươi',
+    'Thịt bò': 'thịt bò, lưng, nạc, tươi',
+    'Thịt gà': 'thịt gà công nghiệp, lườn, raw',
     'Thịt heo': 'thịt lợn, nạc, tươi',
     'Thịt vịt': 'Thịt vịt, tươi',
     'Tôm': 'tôm biển, tươi',
@@ -192,7 +206,8 @@ class FoodRepository {
     ];
 
     final coreKeys = [
-      'code', 'name_vi', 'category', 
+      'code', 'name_vi', 'food_label', 'part_name', 'cooking_method',
+      'Nhóm Dinh Dưỡng Chính', 'category',
       'Năng lượng', 'Chất đạm', 'Chất béo (Fat)', 'Chất bột đường', 'Chất xơ'
     ];
     
@@ -312,6 +327,166 @@ class FoodRepository {
       actualWeight: actualWeight,
     );
     return list.first;
+  }
+
+  // =========================================================================
+  // TRA CỨU PHẦN THỨC ĂN & PHƯƠNG PHÁP CHẾ BIẾN (từ food_label, part_name, cooking_method)
+  // =========================================================================
+
+  String _mapToCsvLabel(String displayLabel) {
+    final norm = _normalizeString(displayLabel);
+    if (norm == 'bạch tuộc') return 'Mực';
+    if (norm.startsWith('trứng')) return 'Trứng';
+    return displayLabel.trim();
+  }
+
+  List<Map<String, dynamic>> _rowsForDisplayLabel(String displayLabel) {
+    final key = _normalizeString(_mapToCsvLabel(displayLabel));
+    return _rowsByLabel[key] ?? const [];
+  }
+
+  /// Xác định nhãn gốc (50 món AI) từ tên hiển thị trong ScanHistory (hỗ trợ cả dữ liệu cũ và định dạng mới).
+  String resolveDisplayLabel(String foodName) {
+    final norm = _normalizeString(foodName);
+    if (norm.startsWith('bạch tuộc')) return 'Bạch tuộc';
+
+    final matchedRow = resolveRowFromFoodName(foodName);
+    final csvLabel = matchedRow?['food_label']?.toString().trim() ?? '';
+    if (csvLabel.isNotEmpty) return csvLabel;
+
+    // Fallback khớp tiền tố theo danh sách nhãn AI
+    String? bestKey;
+    for (final key in csvNameMapper.keys) {
+      final keyNorm = _normalizeString(key);
+      if (norm == keyNorm || norm.startsWith('$keyNorm -') || norm.startsWith('$keyNorm (')) {
+        if (bestKey == null || keyNorm.length > bestKey.length) {
+          bestKey = key;
+        }
+      }
+    }
+    return bestKey ?? foodName.trim();
+  }
+
+  /// Tra cứu dòng CSV chính xác tương ứng với tên món lưu trong ScanHistory.
+  Map<String, dynamic>? resolveRowFromFoodName(String foodName) {
+    final norm = _normalizeString(foodName);
+    if (norm.isEmpty) return null;
+
+    // 1. Khớp định dạng hiển thị "Nhãn - Phần (Chế biến)" hoặc "Nhãn (Chế biến)"
+    final bool isOctopus = norm.startsWith('bạch tuộc');
+    for (final row in _allRows) {
+      final override = isOctopus && _normalizeString(row['food_label']?.toString() ?? '') == 'mực'
+          ? 'Bạch tuộc'
+          : null;
+      final formatted = _normalizeString(formatDisplayName(row, overrideLabel: override));
+      if (formatted == norm) return row;
+
+      final rawName = _normalizeString(row['name_vi']?.toString() ?? '');
+      if (rawName == norm) return row;
+    }
+
+    // 2. Khớp theo tên nhãn gốc trong csvNameMapper (ví dụ: "Thịt bò", "Bầu"...)
+    for (final entry in csvNameMapper.entries) {
+      if (_normalizeString(entry.key) == norm) {
+        return findFoodByName(entry.value);
+      }
+    }
+
+    // 3. Fallback tìm gần đúng như cũ
+    return findFoodByName(foodName);
+  }
+
+  /// Danh sách các phần/biến thể của một nhãn thực phẩm (đưa phần mặc định lên đầu tiên).
+  List<String> getPartsForLabel(String displayLabel) {
+    final rows = _rowsForDisplayLabel(displayLabel);
+    if (rows.isEmpty) return const [];
+
+    final List<String> parts = [];
+    for (final r in rows) {
+      final part = r['part_name']?.toString().trim() ?? '';
+      if (part.isNotEmpty && !parts.contains(part)) {
+        parts.add(part);
+      }
+    }
+    if (parts.length <= 1) return parts;
+
+    // Đưa phần mặc định (khớp csvNameMapper) lên vị trí đầu tiên
+    final mappedCsvName = csvNameMapper[displayLabel] ?? csvNameMapper[resolveDisplayLabel(displayLabel)];
+    if (mappedCsvName != null) {
+      final defRow = findFoodByName(mappedCsvName);
+      final defPart = defRow?['part_name']?.toString().trim() ?? '';
+      if (defPart.isNotEmpty && parts.contains(defPart)) {
+        parts.remove(defPart);
+        parts.insert(0, defPart);
+      }
+    }
+    return parts;
+  }
+
+  /// Danh sách các dòng CSV tương ứng với các phương pháp chế biến của một (nhãn, phần).
+  /// Luôn ưu tiên đưa "Tươi" lên đầu tiên nếu có.
+  List<Map<String, dynamic>> getCookingRowsForPart(String displayLabel, String partName) {
+    final rows = _rowsForDisplayLabel(displayLabel);
+    final partTarget = partName.trim();
+
+    final matching = rows.where((r) {
+      final rowPart = r['part_name']?.toString().trim() ?? '';
+      return rowPart == partTarget;
+    }).toList();
+
+    matching.sort((a, b) {
+      final ca = _normalizeString(a['cooking_method']?.toString() ?? '');
+      final cb = _normalizeString(b['cooking_method']?.toString() ?? '');
+      final aIsFresh = ca == 'tươi' || ca == 'sống';
+      final bIsFresh = cb == 'tươi' || cb == 'sống';
+      if (aIsFresh && !bIsFresh) return -1;
+      if (!aIsFresh && bIsFresh) return 1;
+      return 0;
+    });
+
+    return matching;
+  }
+
+  /// Chọn dòng mặc định cho một phần khi đổi phần (ưu tiên "Tươi" nếu có).
+  Map<String, dynamic>? findPreferredRowForPart(String displayLabel, String partName) {
+    final options = getCookingRowsForPart(displayLabel, partName);
+    return options.isNotEmpty ? options.first : null;
+  }
+
+  /// Kiểm tra xem cả nhóm món có nhiều hơn 1 phương pháp chế biến khác nhau không.
+  bool hasAnyCookingVariation(String displayLabel) {
+    final rows = _rowsForDisplayLabel(displayLabel);
+    final methods = <String>{};
+    for (final r in rows) {
+      final m = r['cooking_method']?.toString().trim() ?? '';
+      if (m.isNotEmpty) methods.add(m);
+    }
+    return methods.length >= 2;
+  }
+
+  /// Định dạng tên hiển thị chuẩn cho món ăn theo phần & phương pháp chế biến.
+  String formatDisplayName(Map<String, dynamic> row, {String? overrideLabel}) {
+    final csvLabel = row['food_label']?.toString().trim() ?? '';
+    final part = row['part_name']?.toString().trim() ?? '';
+    final cook = row['cooking_method']?.toString().trim() ?? '';
+
+    if (csvLabel == 'Trứng' && part.isNotEmpty) {
+      return part;
+    }
+
+    final label = (overrideLabel != null && overrideLabel.trim().isNotEmpty)
+        ? overrideLabel.trim()
+        : (csvLabel.isNotEmpty ? csvLabel : (row['name_vi']?.toString().trim() ?? 'Món ăn'));
+
+    if (part.isNotEmpty) {
+      return cook.isNotEmpty ? '$label - $part ($cook)' : '$label - $part';
+    }
+
+    final cookOptions = getCookingRowsForPart(label, '');
+    if (cookOptions.length > 1 && cook.isNotEmpty) {
+      return '$label ($cook)';
+    }
+    return label;
   }
 }
 

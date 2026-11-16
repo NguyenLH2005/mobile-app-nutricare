@@ -21,7 +21,7 @@ class DatabaseHelper {
 
     return await openDatabase(
       path,
-      version: 11,
+      version: 12,
       onCreate: _createDB,
       onUpgrade: (db, oldVersion, newVersion) async {
         if (oldVersion < 8) {
@@ -61,6 +61,11 @@ class DatabaseHelper {
             await db.execute("ALTER TABLE scan_history ADD COLUMN log_date TEXT");
           } catch (_) {}
         }
+        if (oldVersion < 12) {
+          try {
+            await db.execute("ALTER TABLE scan_history ADD COLUMN is_in_menu INTEGER NOT NULL DEFAULT 1");
+          } catch (_) {}
+        }
       },
     );
   }
@@ -81,6 +86,7 @@ class DatabaseHelper {
       serving_units REAL,
       consumption_ratio REAL NOT NULL DEFAULT 1.0,
       log_date TEXT,
+      is_in_menu INTEGER NOT NULL DEFAULT 0,
       nutrition_data TEXT NOT NULL,
       main_group TEXT NOT NULL,
       created_at TEXT NOT NULL,
@@ -145,7 +151,7 @@ class DatabaseHelper {
     final db = await instance.database;
     final result = await db.query(
       'scan_history',
-      where: 'log_date = ? OR created_at LIKE ?',
+      where: "is_in_menu = 1 AND (log_date = ? OR ((log_date IS NULL OR log_date = '') AND created_at LIKE ?))",
       whereArgs: [dateStr, '$dateStr%'],
       orderBy: 'created_at DESC',
     );

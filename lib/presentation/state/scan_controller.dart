@@ -42,8 +42,11 @@ class ScanController extends Notifier<ScanState> {
     final result = await useCase.execute(imagePath);
 
     if (result != null) {
-      // Đẩy kết quả sang màn hình FoundObjectScreen (chưa ghi vào nhật ký ngày cho tới khi bấm Thêm vào thực đơn)
-      state = ScanState(status: ScanStatus.success, result: result);
+      // Tự động lưu ngay thẻ lịch sử tra cứu vào SQLite (isInMenu = false để chưa tính vào thực đơn ngày)
+      final newId = await DatabaseHelper.instance.insertScan(result);
+      final savedResult = result.copyWith(id: newId);
+      ref.invalidate(historyProvider);
+      state = ScanState(status: ScanStatus.success, result: savedResult);
     } else {
       state = ScanState(status: ScanStatus.error);
     }

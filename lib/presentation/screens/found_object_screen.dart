@@ -1,5 +1,6 @@
-import '../../data/datasources/local/database_helper.dart';
+import 'dart:async';
 import 'dart:convert';
+import '../../data/datasources/local/database_helper.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -79,6 +80,11 @@ class _FoundObjectScreenState extends ConsumerState<FoundObjectScreen> {
   bool _isAddedToMenu = false;
   final TextEditingController _eggPortionController = TextEditingController();
   double _eggEatenCount = 1.0;
+  Timer? _syncDebounce;
+
+  String _formatDateYmd(DateTime dt) {
+    return '${dt.year.toString().padLeft(4, '0')}-${dt.month.toString().padLeft(2, '0')}-${dt.day.toString().padLeft(2, '0')}';
+  }
 
 
   bool get _isEggFood {
@@ -101,9 +107,9 @@ class _FoundObjectScreenState extends ConsumerState<FoundObjectScreen> {
     super.initState();
     _currentData = widget.resultData;
     _suggestionText = _currentData.aiSuggestion;
-    final todayStr = DateTime.now().toIso8601String().substring(0, 10);
-    final scanDate = _currentData.logDate ?? _currentData.createdAt.toIso8601String().substring(0, 10);
-    _isAddedToMenu = _currentData.id != null && scanDate == todayStr;
+    final todayStr = _formatDateYmd(DateTime.now());
+    final scanDate = _currentData.logDate ?? _formatDateYmd(_currentData.createdAt);
+    _isAddedToMenu = _currentData.id != null && _currentData.isInMenu && scanDate == todayStr;
     if (_isEggFood) {
       _eggEatenCount = _currentData.consumptionRatio;
       if (_eggEatenCount <= 0) _eggEatenCount = 1.0;
@@ -114,8 +120,24 @@ class _FoundObjectScreenState extends ConsumerState<FoundObjectScreen> {
 
     if (widget.isFromScan) {
       WidgetsBinding.instance.addPostFrameCallback((_) async {
-        if (_isEggFood) {
+        if (_currentData.id == null) {
+          final saved = await _persistScanUpdate(_currentData);
+          if (mounted) {
+            setState(() {
+              _currentData = saved;
+            });
+          }
+        } else {
+          ref.read(syncProvider.notifier).syncNow();
+        }
+        if (_isEggFood && mounted) {
           await _showEggSelectionModal();
+        } else if (mounted) {
+          final repo = ref.read(foodRepositoryProvider);
+          final label = repo.resolveDisplayLabel(_currentData.foodName);
+          if (repo.getPartsForLabel(label).length >= 2) {
+            await _showPartSelectionModal();
+          }
         }
       });
     }
@@ -123,8 +145,60 @@ class _FoundObjectScreenState extends ConsumerState<FoundObjectScreen> {
 
   @override
   void dispose() {
+    _syncDebounce?.cancel();
     _eggPortionController.dispose();
     super.dispose();
+  }
+
+  Future<ScanHistory> _persistScanUpdate(
+    ScanHistory updatedData, {
+    bool debounceSync = false,
+  }) async {
+    ScanHistory saved = updatedData;
+    if (saved.id == null) {
+      final newId = await DatabaseHelper.instance.insertScan(saved);
+      saved = saved.copyWith(id: newId);
+      ref.invalidate(historyProvider);
+    } else {
+      await ref.read(historyControllerProvider.notifier).updateScan(saved);
+    }
+
+    if (debounceSync) {
+      _syncDebounce?.cancel();
+      _syncDebounce = Timer(const Duration(milliseconds: 500), () {
+        if (mounted) {
+          ref.read(syncProvider.notifier).syncNow();
+        }
+      });
+    } else {
+      _syncDebounce?.cancel();
+      ref.read(syncProvider.notifier).syncNow();
+    }
+    return saved;
+  }
+
+  double _recalculateServingUnits(
+    List<dynamic> nutritionList,
+    String mainGroup,
+    double weight,
+    double ratio,
+  ) {
+    double p100 = 0, c100 = 0, f100 = 0;
+    for (var item in nutritionList) {
+      if (item['id'] == 'protein') p100 = (item['per_100g'] as num?)?.toDouble() ?? 0.0;
+      if (item['id'] == 'carb') c100 = (item['per_100g'] as num?)?.toDouble() ?? 0.0;
+      if (item['id'] == 'fat' || item['id'] == 'total_fat') {
+        f100 = (item['per_100g'] as num?)?.toDouble() ?? 0.0;
+      }
+    }
+    final actualW = weight * (ratio > 0 ? ratio : 1.0);
+    return ref.read(foodRepositoryProvider).calculateServingUnit(
+      mainGroup: mainGroup,
+      p100: p100,
+      c100: c100,
+      f100: f100,
+      actualWeight: actualW,
+    ).servingCount;
   }
 
   void _onEggPortionChanged(String val) {
@@ -156,37 +230,30 @@ class _FoundObjectScreenState extends ConsumerState<FoundObjectScreen> {
   Future<void> _handleAddToMenu() async {
     try {
       final now = DateTime.now();
-      final todayStr = '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+      final todayStr = _formatDateYmd(now);
+      final bool nextInMenu = !_isAddedToMenu;
 
-      _currentData = _currentData.copyWith(
-        logDate: todayStr,
+      final updatedData = _currentData.copyWith(
+        logDate: nextInMenu ? todayStr : _currentData.logDate,
+        isInMenu: nextInMenu,
+        isSynced: 0,
         updatedAt: now,
       );
 
-      if (_currentData.id == null) {
-        final newId = await DatabaseHelper.instance.insertScan(_currentData);
-        if (mounted) {
-          setState(() {
-            _currentData = _currentData.copyWith(id: newId);
-            _isAddedToMenu = true;
-          });
-        }
-      } else {
-        await DatabaseHelper.instance.updateScan(_currentData);
-        if (mounted) {
-          setState(() {
-            _isAddedToMenu = true;
-          });
-        }
-      }
-      ref.invalidate(historyProvider);
-      ref.read(syncProvider.notifier).syncNow();
-
+      final saved = await _persistScanUpdate(updatedData);
       if (mounted) {
+        setState(() {
+          _currentData = saved;
+          _isAddedToMenu = nextInMenu;
+        });
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('✓ Đã thêm "${_currentData.foodName}" vào thực đơn hôm nay!'),
-            backgroundColor: Colors.green.shade700,
+            content: Text(
+              nextInMenu
+                  ? '✓ Đã thêm "${_currentData.foodName}" vào thực đơn hôm nay!'
+                  : 'Đã gỡ "${_currentData.foodName}" khỏi thực đơn hôm nay (vẫn giữ trong Lịch sử).',
+            ),
+            backgroundColor: nextInMenu ? Colors.green.shade700 : Colors.blueGrey.shade700,
             behavior: SnackBarBehavior.floating,
           ),
         );
@@ -228,7 +295,7 @@ class _FoundObjectScreenState extends ConsumerState<FoundObjectScreen> {
       _suggestionError = null;
     });
 
-    var rawFoodData = ref.read(foodRepositoryProvider).findFoodByName(_currentData.foodName);
+    var rawFoodData = ref.read(foodRepositoryProvider).resolveRowFromFoodName(_currentData.foodName);
     if (rawFoodData == null) {
       final decoded = _currentData.decodedNutrition;
       final Map<String, dynamic> fallbackData = {};
@@ -277,13 +344,10 @@ class _FoundObjectScreenState extends ConsumerState<FoundObjectScreen> {
         isSynced: 0,
         updatedAt: DateTime.now(),
       );
-      if (_currentData.id != null) {
-        await ref.read(historyControllerProvider.notifier).updateScan(updatedData);
-        ref.read(syncProvider.notifier).syncNow();
-      }
+      final saved = await _persistScanUpdate(updatedData);
       if (mounted) {
         setState(() {
-          _currentData = updatedData;
+          _currentData = saved;
         });
       }
     } catch (e) {
@@ -304,26 +368,278 @@ class _FoundObjectScreenState extends ConsumerState<FoundObjectScreen> {
     final String mainGroup = foodData['Nhóm Dinh Dưỡng Chính']?.toString().trim() ?? 'Protein, Chất béo';
     final List<Map<String, dynamic>> nutritionArray = 
         ref.read(foodRepositoryProvider).buildNutritionArray(foodData, newWeight);
+    final double servingCount = _recalculateServingUnits(
+      nutritionArray,
+      mainGroup,
+      newWeight,
+      _currentData.consumptionRatio,
+    );
 
     final updatedData = _currentData.copyWith(
       foodName: selectedEgg.displayName,
       weight: newWeight,
+      servingUnits: servingCount,
       nutritionData: jsonEncode(nutritionArray),
       mainGroup: mainGroup,
       isSynced: 0,
       updatedAt: DateTime.now(),
     );
 
-    if (_currentData.id != null) {
-      await ref.read(historyControllerProvider.notifier).updateScan(updatedData);
-      ref.read(syncProvider.notifier).syncNow();
-    }
+    final saved = await _persistScanUpdate(updatedData);
 
     if (mounted) {
       setState(() {
-        _currentData = updatedData;
+        _currentData = saved;
       });
     }
+  }
+
+  Future<void> _applySelectedCsvRow(
+    Map<String, dynamic> foodData, {
+    required String displayLabel,
+  }) async {
+    final repo = ref.read(foodRepositoryProvider);
+    final double targetWeight = _currentData.weight ?? 100.0;
+    final String mainGroup =
+        foodData['Nhóm Dinh Dưỡng Chính']?.toString().trim() ?? _currentData.mainGroup;
+    final List<Map<String, dynamic>> nutritionArray =
+        repo.buildNutritionArray(foodData, targetWeight);
+    final double servingCount = _recalculateServingUnits(
+      nutritionArray,
+      mainGroup,
+      targetWeight,
+      _currentData.consumptionRatio,
+    );
+    final String formattedName = repo.formatDisplayName(
+      foodData,
+      overrideLabel: displayLabel,
+    );
+
+    final updatedData = _currentData.copyWith(
+      foodName: formattedName,
+      servingUnits: servingCount,
+      nutritionData: jsonEncode(nutritionArray),
+      mainGroup: mainGroup,
+      isSynced: 0,
+      updatedAt: DateTime.now(),
+    );
+
+    final saved = await _persistScanUpdate(updatedData);
+    if (mounted) {
+      setState(() {
+        _currentData = saved;
+      });
+    }
+  }
+
+  Future<void> _showPartSelectionModal() async {
+    final repo = ref.read(foodRepositoryProvider);
+    final String displayLabel = repo.resolveDisplayLabel(_currentData.foodName);
+    final List<String> parts = repo.getPartsForLabel(displayLabel);
+    if (parts.length < 2) return;
+
+    final currentRow = repo.resolveRowFromFoodName(_currentData.foodName);
+    final String currentPart = currentRow?['part_name']?.toString().trim() ?? '';
+    String selectedPart = parts.contains(currentPart) ? currentPart : parts.first;
+
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (bottomSheetContext) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            return Padding(
+              padding: EdgeInsets.only(
+                bottom: MediaQuery.of(bottomSheetContext).viewInsets.bottom,
+              ),
+              child: Container(
+                constraints: BoxConstraints(
+                  maxHeight: MediaQuery.of(bottomSheetContext).size.height * 0.78,
+                ),
+                decoration: const BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+                ),
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(Icons.restaurant_menu, color: Colors.green.shade700, size: 22),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'Chọn Phần / Loại: $displayLabel',
+                            style: const TextStyle(
+                              fontSize: 17,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF1B233A),
+                            ),
+                          ),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.close, color: Colors.grey),
+                          onPressed: () => Navigator.pop(bottomSheetContext),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Chọn đúng phần thực phẩm bạn đang dùng để hệ thống tính calo, dinh dưỡng và cách chế biến chính xác (phần phổ biến được đặt lên đầu):',
+                      style: TextStyle(fontSize: 13, color: Colors.grey.shade600, height: 1.35),
+                    ),
+                    const SizedBox(height: 12),
+                    Flexible(
+                      child: ListView.builder(
+                        shrinkWrap: true,
+                        itemCount: parts.length,
+                        itemBuilder: (_, idx) {
+                          final part = parts[idx];
+                          final isSelected = part == selectedPart;
+                          final isDefault = idx == 0;
+                          final cookRows = repo.getCookingRowsForPart(displayLabel, part);
+                          final prefRow = cookRows.isNotEmpty ? cookRows.first : null;
+                          final kcalVal = double.tryParse(prefRow?['Năng lượng']?.toString() ?? '') ?? 0.0;
+                          final methodsText = cookRows
+                              .map((r) => r['cooking_method']?.toString().trim() ?? '')
+                              .where((m) => m.isNotEmpty)
+                              .join(' • ');
+
+                          return InkWell(
+                            onTap: () {
+                              setModalState(() {
+                                selectedPart = part;
+                              });
+                            },
+                            borderRadius: BorderRadius.circular(12),
+                            child: Container(
+                              margin: const EdgeInsets.only(bottom: 8),
+                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                              decoration: BoxDecoration(
+                                color: isSelected
+                                    ? Colors.green.shade50.withValues(alpha: 0.7)
+                                    : Colors.white,
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                  color: isSelected ? Colors.green.shade600 : Colors.grey.shade200,
+                                  width: isSelected ? 1.8 : 1.0,
+                                ),
+                              ),
+                              child: Row(
+                                children: [
+                                  Icon(
+                                    isSelected ? Icons.check_circle : Icons.radio_button_unchecked,
+                                    color: isSelected ? Colors.green.shade700 : Colors.grey.shade400,
+                                    size: 20,
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Row(
+                                          children: [
+                                            Flexible(
+                                              child: Text(
+                                                part,
+                                                style: TextStyle(
+                                                  fontSize: 15,
+                                                  fontWeight: FontWeight.bold,
+                                                  color: isSelected
+                                                      ? Colors.green.shade900
+                                                      : const Color(0xFF1B233A),
+                                                ),
+                                              ),
+                                            ),
+                                            if (isDefault) ...[
+                                              const SizedBox(width: 6),
+                                              Container(
+                                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                                decoration: BoxDecoration(
+                                                  color: Colors.amber.shade50,
+                                                  borderRadius: BorderRadius.circular(4),
+                                                  border: Border.all(color: Colors.amber.shade300),
+                                                ),
+                                                child: Text(
+                                                  'Phổ biến',
+                                                  style: TextStyle(
+                                                    fontSize: 10,
+                                                    fontWeight: FontWeight.w600,
+                                                    color: Colors.amber.shade900,
+                                                  ),
+                                                ),
+                                              ),
+                                            ],
+                                          ],
+                                        ),
+                                        if (methodsText.isNotEmpty) ...[
+                                          const SizedBox(height: 3),
+                                          Text(
+                                            'Chế biến: $methodsText',
+                                            style: TextStyle(fontSize: 11.5, color: Colors.grey.shade600),
+                                          ),
+                                        ],
+                                      ],
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                                    decoration: BoxDecoration(
+                                      color: isSelected ? Colors.green.shade100 : Colors.grey.shade100,
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: Text(
+                                      '${kcalVal.toStringAsFixed(0)} kcal/100g',
+                                      style: TextStyle(
+                                        fontSize: 11.5,
+                                        fontWeight: FontWeight.bold,
+                                        color: isSelected ? Colors.green.shade800 : Colors.grey.shade700,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    SizedBox(
+                      width: double.infinity,
+                      height: 48,
+                      child: ElevatedButton(
+                        onPressed: () {
+                          Navigator.pop(bottomSheetContext);
+                          final targetRow = repo.findPreferredRowForPart(displayLabel, selectedPart);
+                          if (targetRow != null) {
+                            _applySelectedCsvRow(targetRow, displayLabel: displayLabel);
+                          }
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.green,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          elevation: 0,
+                        ),
+                        child: const Text(
+                          'ÁP DỤNG',
+                          style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
   }
 
   Future<void> _showEggSelectionModal() async {
@@ -474,36 +790,25 @@ class _FoundObjectScreenState extends ConsumerState<FoundObjectScreen> {
   }
 
   Future<void> _setConsumptionRatio(double newRatio, {bool fromEggInput = false}) async {
-    final list = _currentData.decodedNutrition;
-    double p100 = 0, c100 = 0, f100 = 0;
-    for (var item in list) {
-      if (item['id'] == 'protein') p100 = (item['per_100g'] as num?)?.toDouble() ?? 0.0;
-      if (item['id'] == 'carb') c100 = (item['per_100g'] as num?)?.toDouble() ?? 0.0;
-      if (item['id'] == 'fat' || item['id'] == 'total_fat') f100 = (item['per_100g'] as num?)?.toDouble() ?? 0.0;
-    }
-    final actualW = (_currentData.weight ?? 100.0) * newRatio;
-    final servingInfo = ref.read(foodRepositoryProvider).calculateServingUnit(
-      mainGroup: _currentData.mainGroup,
-      p100: p100,
-      c100: c100,
-      f100: f100,
-      actualWeight: actualW,
+    final double servingCount = _recalculateServingUnits(
+      _currentData.decodedNutrition,
+      _currentData.mainGroup,
+      _currentData.weight ?? 100.0,
+      newRatio,
     );
 
     final updatedData = _currentData.copyWith(
       consumptionRatio: newRatio,
-      servingUnits: servingInfo.servingCount,
+      servingUnits: servingCount,
       isSynced: 0,
       updatedAt: DateTime.now(),
     );
 
-    if (_currentData.id != null && _isAddedToMenu) {
-      await ref.read(historyControllerProvider.notifier).updateScan(updatedData);
-      ref.read(syncProvider.notifier).syncNow();
-    }
+    final saved = await _persistScanUpdate(updatedData, debounceSync: fromEggInput);
 
+    if (!mounted) return;
     setState(() {
-      _currentData = updatedData;
+      _currentData = saved;
       if (!fromEggInput && _isEggFood) {
         _eggEatenCount = newRatio;
         _eggPortionController.text = _eggEatenCount == _eggEatenCount.roundToDouble()
@@ -664,19 +969,28 @@ class _FoundObjectScreenState extends ConsumerState<FoundObjectScreen> {
           }
         }
         
+        final double servingCount = _recalculateServingUnits(
+          jsonArr,
+          _currentData.mainGroup,
+          newWeight,
+          _currentData.consumptionRatio,
+        );
+
         final updatedData = _currentData.copyWith(
           weight: newWeight,
+          servingUnits: servingCount,
           nutritionData: jsonEncode(jsonArr),
           isSynced: 0,
           updatedAt: DateTime.now(),
         );
 
-        await ref.read(historyControllerProvider.notifier).updateScan(updatedData);
-        ref.read(syncProvider.notifier).syncNow();
+        final saved = await _persistScanUpdate(updatedData);
 
-        setState(() {
-          _currentData = updatedData;
-        });
+        if (mounted) {
+          setState(() {
+            _currentData = saved;
+          });
+        }
       }
     }
   }
@@ -801,7 +1115,23 @@ class _FoundObjectScreenState extends ConsumerState<FoundObjectScreen> {
       if (item['id'] == 'fiber') fiber = item;
     }
 
-    final servingUnits = ref.read(foodRepositoryProvider).calculateAllServingUnits(
+    final foodRepo = ref.read(foodRepositoryProvider);
+    final String displayLabel = _isEggFood ? 'Trứng' : foodRepo.resolveDisplayLabel(_currentData.foodName);
+    final List<String> availableParts = _isEggFood ? const [] : foodRepo.getPartsForLabel(displayLabel);
+    final bool hasMultipleParts = !_isEggFood && availableParts.length >= 2;
+    final Map<String, dynamic>? currentCsvRow =
+        _isEggFood ? null : foodRepo.resolveRowFromFoodName(_currentData.foodName);
+    final String currentPartName = currentCsvRow?['part_name']?.toString().trim() ??
+        (availableParts.isNotEmpty ? availableParts.first : '');
+    final String currentCookingMethod =
+        currentCsvRow?['cooking_method']?.toString().trim() ?? 'Tươi';
+    final List<Map<String, dynamic>> cookingRows =
+        _isEggFood ? const [] : foodRepo.getCookingRowsForPart(displayLabel, currentPartName);
+    final bool showCookingCard = !_isEggFood &&
+        (cookingRows.length >= 2 ||
+            (hasMultipleParts && foodRepo.hasAnyCookingVariation(displayLabel)));
+
+    final servingUnits = foodRepo.calculateAllServingUnits(
       mainGroup: _currentData.mainGroup,
       p100: p100,
       c100: c100,
@@ -919,6 +1249,26 @@ class _FoundObjectScreenState extends ConsumerState<FoundObjectScreen> {
                           ),
                         ),
                       ),
+                    ] else if (hasMultipleParts) ...[
+                      const SizedBox(height: 12),
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton.icon(
+                          onPressed: () => _showPartSelectionModal(),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.teal.shade700,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                            elevation: 0,
+                          ),
+                          icon: const Icon(Icons.tune, size: 18),
+                          label: Text(
+                            'Phần: ${currentPartName.isNotEmpty ? currentPartName : "Mặc định"} • Nhấn để đổi',
+                            style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                      ),
                     ],
                   ],
                 ),
@@ -965,6 +1315,100 @@ class _FoundObjectScreenState extends ConsumerState<FoundObjectScreen> {
                 ),
               ),
               const SizedBox(height: 12),
+
+              // 2.15. PHƯƠNG PHÁP CHẾ BIẾN (các ô bấm đổi màu, đặt ngay trên mục Khẩu phần ăn thực tế)
+              if (showCookingCard && cookingRows.isNotEmpty) ...[
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                    boxShadow: [
+                      BoxShadow(color: Colors.black.withValues(alpha: 0.02), blurRadius: 8, offset: const Offset(0, 3)),
+                    ],
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(Icons.local_fire_department_outlined, size: 18, color: Colors.deepOrange.shade600),
+                          const SizedBox(width: 6),
+                          const Expanded(
+                            child: Text(
+                              'Phương pháp chế biến',
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF1B233A),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 10),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: cookingRows.map((row) {
+                          final String method = row['cooking_method']?.toString().trim() ?? 'Tươi';
+                          final bool isSelected = method.toLowerCase() == currentCookingMethod.toLowerCase();
+                          final double kcalVal = double.tryParse(row['Năng lượng']?.toString() ?? '') ?? 0.0;
+
+                          return InkWell(
+                            onTap: isSelected
+                                ? null
+                                : () => _applySelectedCsvRow(row, displayLabel: displayLabel),
+                            borderRadius: BorderRadius.circular(10),
+                            child: AnimatedContainer(
+                              duration: const Duration(milliseconds: 160),
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                              decoration: BoxDecoration(
+                                color: isSelected ? Colors.green.shade100 : Colors.grey.shade100,
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(
+                                  color: isSelected ? Colors.green.shade600 : Colors.grey.shade300,
+                                  width: isSelected ? 1.5 : 1.0,
+                                ),
+                              ),
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    method,
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
+                                      color: isSelected ? Colors.green.shade900 : Colors.black87,
+                                    ),
+                                  ),
+                                  Text(
+                                    '${kcalVal.toStringAsFixed(0)} kcal/100g',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      color: isSelected ? Colors.green.shade800 : Colors.grey.shade600,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          );
+                        }).toList(),
+                      ),
+                      if (cookingRows.length == 1) ...[
+                        const SizedBox(height: 8),
+                        Text(
+                          'Phần này hiện chỉ có dữ liệu chế biến: ${cookingRows.first['cooking_method']}.',
+                          style: TextStyle(fontSize: 11.5, color: Colors.grey.shade600, fontStyle: FontStyle.italic),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 12),
+              ],
 
               // 2.2. THANH CHỌN HỆ SỐ TIÊU THỤ THỰC TẾ (gamma in (0, 1])
               Container(

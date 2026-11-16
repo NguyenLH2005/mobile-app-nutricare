@@ -294,6 +294,25 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
                                           fontWeight: item.consumptionRatio < 0.99 ? FontWeight.w600 : FontWeight.normal,
                                         ),
                                       ),
+                                    if (item.isInMenu) ...[
+                                      const SizedBox(height: 4),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                        decoration: BoxDecoration(
+                                          color: Colors.green.shade50,
+                                          borderRadius: BorderRadius.circular(4),
+                                          border: Border.all(color: Colors.green.shade200),
+                                        ),
+                                        child: Text(
+                                          'Trong thực đơn',
+                                          style: TextStyle(
+                                            fontSize: 10,
+                                            fontWeight: FontWeight.w600,
+                                            color: Colors.green.shade800,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
                                   ],
                                 ),
                               ),
