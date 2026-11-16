@@ -1,11 +1,20 @@
 import 'dart:isolate';
 import 'dart:io';
 import 'dart:math';
+import 'dart:ui' show Rect;
 
+import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:image/image.dart' as img;
 import 'package:path_provider/path_provider.dart';
 import 'package:tflite_flutter/tflite_flutter.dart';
 import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
+
+class OcrTextLine {
+  final String text;
+  final Rect? box;
+
+  const OcrTextLine({required this.text, this.box});
+}
 
 class AIHelper {
   String _removeDiacritics(String str) {
@@ -265,6 +274,19 @@ class AIHelper {
     return labels[maxIndex];
   }
 
+  static final RegExp _weightKeywordRegex = RegExp(
+    r'(?:khoi\s*luong(?:\s*tinh)?|trong\s*luong(?:\s*tinh)?|t[\s\.]*luong|tr[\s\.]*luong|kl(?:\s*tinh)?|tl(?:\s*tinh)?|net\s*w(?:eigh)?t)\b(?:(?:\s*\(\s*|\s+)(kg|gram|gr|g)\b\s*\)?)?[^\d\n]{0,15}?(\d+(?:[.,]\d+)?)\s*(kg|gram|gr|g|k)?',
+    caseSensitive: false,
+  );
+  static final RegExp _weightHeaderRegex = RegExp(
+    r'(?:khoi\s*luong(?:\s*tinh)?|trong\s*luong(?:\s*tinh)?|t[\s\.]*luong|tr[\s\.]*luong|\bkl\b|\btl\b|net\s*w(?:eigh)?t)(?:(?:\s*\(\s*|\s+)(kg|gram|gr|g)\b\s*\)?)?',
+    caseSensitive: false,
+  );
+  static final RegExp _priceOrDateRowRegex = RegExp(
+    r'\b(?:don\s*gia|thanh\s*tien|tong\s*tien|tien\s*hang|gia\s*ban|ngay\s*dong\s*goi|ngay\s*sx|nsx|hsd|han\s*su\s*dung)\b',
+    caseSensitive: false,
+  );
+
   /// 3. CHẠY MODEL ML KIT ĐỂ ĐỌC CHỮ VÀ BÓC TÁCH KHỐI LƯỢNG
   Future<String?> readLabelWeight(String labelImagePath) async {
     final inputImage = InputImage.fromFilePath(labelImagePath);
@@ -272,93 +294,208 @@ class AIHelper {
 
     try {
       final RecognizedText recognizedText = await textRecognizer.processImage(inputImage);
-      
-      List<String> lines = [];
-      for (TextBlock block in recognizedText.blocks) {
-        for (TextLine line in block.lines) {
-          lines.add(line.text);
+      final List<OcrTextLine> ocrLines = [];
+      for (final TextBlock block in recognizedText.blocks) {
+        for (final TextLine line in block.lines) {
+          ocrLines.add(OcrTextLine(text: line.text, box: line.boundingBox));
         }
       }
-      
-      if (lines.isEmpty) return null;
-      String fullText = lines.join(" ");
-      String normalizedText = _removeDiacritics(fullText).toLowerCase();
-      List<String> normalizedLines = lines.map((l) => _removeDiacritics(l).toLowerCase()).toList();
-      
-      int klIndex = -1;
-      int donGiaIndex = -1;
-      
-      for (int i = 0; i < lines.length; i++) {
-        final word = normalizedLines[i];
-        if (RegExp(r'kl|khoi|trong').hasMatch(word)) {
-          klIndex = i;
-        }
-        if (RegExp(r'don\s*gia|gi.').hasMatch(word)) {
-          donGiaIndex = i;
-        }
-      }
-
-      // Loại trừ ngữ cảnh đơn giá (VD: 25.000 d/100g) khỏi vị trí khối lượng
-      if (donGiaIndex != -1 && (klIndex == donGiaIndex || (klIndex - donGiaIndex).abs() <= 1)) {
-        klIndex = -1;
-      }
-
-      String? weightCandidate;
-      String context = "";
-
-      // Logic 1: Tìm từ vị trí KL
-      if (klIndex != -1) {
-        int end = min(lines.length, klIndex + 5);
-        context = lines.sublist(max(0, klIndex), end).join(" ");
-        
-        final match = RegExp(r'(\d+[\.,]?\d*)\s*(g|kg|gram)', caseSensitive: false).firstMatch(context);
-        if (match != null) {
-          String numStr = match.group(1)!.replaceAll(',', '.');
-          try {
-            double val = double.parse(numStr);
-            if ('.'.allMatches(numStr).length <= 1) {
-              if (!numStr.contains('.') && !numStr.contains(',') && numStr.length >= 4 && numStr.startsWith('0')) {
-                val = val / 1000;
-              }
-              if (val >= 0.001 && val <= 5000) {
-                weightCandidate = _formatWeightToken(val, match.group(2)!.toUpperCase());
-              }
-            }
-          } catch (_) {}
-        }
-      }
-
-      // Logic 2: Chạy Regex vét máng trên toàn bộ tem
-      weightCandidate ??= _extractByRegex(normalizedText);
-
-      // Logic 3: Fallback số đơn lẻ quanh khu vực KL
-      if (weightCandidate == null && klIndex != -1) {
-        final matches = RegExp(r'(\d+[\.,]?\d*)').allMatches(context);
-        for (final m in matches) {
-          String numStr = m.group(1)!.replaceAll(',', '.');
-          try {
-            double val = double.parse(numStr);
-            if ('.'.allMatches(numStr).length <= 1 && val > 0 && val <= 5000) {
-              if (val > 1000 && numStr.endsWith('9') && numStr.length <= 4) {
-                val = (val - 9) / 10;
-              }
-              weightCandidate = _formatWeightToken(val, (val < 15) ? 'KG' : 'G');
-              break;
-            }
-          } catch (_) {}
-        }
-      }
-
-      if (weightCandidate != null) {
-        weightCandidate = weightCandidate.replaceAll(RegExp(r'9G$', caseSensitive: false), 'G');
-      }
-
-      return weightCandidate;
+      return extractWeightFromOcrLines(ocrLines);
     } catch (_) {
       return null;
     } finally {
       textRecognizer.close();
     }
+  }
+
+  /// Tách khối lượng tịnh từ danh sách dòng OCR (hỗ trợ ghép hàng theo tọa độ boundingBox
+  /// cho tem chia cột và lọc ngữ cảnh tiền tệ/ngày/mã vạch an toàn).
+  @visibleForTesting
+  String? extractWeightFromOcrLines(List<OcrTextLine> ocrLines) {
+    if (ocrLines.isEmpty) return null;
+
+    final List<String> rows = _groupIntoVisualRows(ocrLines);
+    final List<String> cleanedRows = rows
+        .map((r) => _sanitizeNonWeightText(_removeDiacritics(r).toLowerCase()))
+        .toList();
+
+    // 1. Ưu tiên cao nhất: Từ khóa khối lượng (KL, TL, T.Lượng, Khối lượng, Trọng lượng) trên cùng hàng
+    for (final row in cleanedRows) {
+      final kwMatch = _extractByKeyword(row);
+      if (kwMatch != null) return _postProcessWeightToken(kwMatch);
+    }
+
+    // 2. Trường hợp tem bị nghiêng/tách dòng: từ khóa ở hàng i, số ở hàng i+1 (đã loại giá/ngày)
+    for (int i = 0; i < cleanedRows.length; i++) {
+      final headerMatch = _weightHeaderRegex.firstMatch(cleanedRows[i]);
+      if (headerMatch == null) continue;
+
+      final String? headerUnit = headerMatch.group(1);
+      final int end = min(cleanedRows.length, i + 3);
+      for (int j = i; j < end; j++) {
+        if (j > i && _priceOrDateRowRegex.hasMatch(rows[j])) continue;
+        final unitMatch = _extractByUnit(cleanedRows[j], fallbackUnit: headerUnit);
+        if (unitMatch != null) return _postProcessWeightToken(unitMatch);
+      }
+      for (int j = i; j < end; j++) {
+        if (j > i && _priceOrDateRowRegex.hasMatch(rows[j])) continue;
+        final numMatch = _extractBareNumber(cleanedRows[j], forcedUnit: headerUnit);
+        if (numMatch != null) return _postProcessWeightToken(numMatch);
+      }
+    }
+
+    // 3. Fallback toàn tem: ưu tiên chuỗi có đơn vị (g/kg), sau đó mới vét số trơn trên các hàng không phải giá/ngày
+    final String joinedCleaned = cleanedRows.join(' ');
+    final String? byKeywordJoined = _extractByKeyword(joinedCleaned);
+    if (byKeywordJoined != null) return _postProcessWeightToken(byKeywordJoined);
+
+    final String? byUnitJoined = _extractByUnit(joinedCleaned);
+    if (byUnitJoined != null) return _postProcessWeightToken(byUnitJoined);
+
+    for (int i = 0; i < cleanedRows.length; i++) {
+      // Nếu hàng trước là tiêu đề giá/ngày đứng trơ một mình (không kèm số), bỏ qua số trơ ngay hàng kế tiếp
+      if (i > 0 &&
+          _priceOrDateRowRegex.hasMatch(_removeDiacritics(rows[i - 1]).toLowerCase()) &&
+          !RegExp(r'\d').hasMatch(rows[i - 1]) &&
+          !_weightHeaderRegex.hasMatch(cleanedRows[i])) {
+        continue;
+      }
+      final String? byNumber = _extractBareNumber(cleanedRows[i]);
+      if (byNumber != null) return _postProcessWeightToken(byNumber);
+    }
+
+    return null;
+  }
+
+  List<String> _groupIntoVisualRows(List<OcrTextLine> lines) {
+    final bool hasBoxes = lines.every((l) => l.box != null);
+    if (!hasBoxes) {
+      return lines.map((l) => l.text.trim()).where((t) => t.isNotEmpty).toList();
+    }
+
+    final sorted = List<OcrTextLine>.from(lines)
+      ..sort((a, b) {
+        final dy = a.box!.center.dy.compareTo(b.box!.center.dy);
+        return dy != 0 ? dy : a.box!.left.compareTo(b.box!.left);
+      });
+
+    final List<List<OcrTextLine>> rowGroups = [];
+    for (final line in sorted) {
+      if (line.text.trim().isEmpty) continue;
+      bool placed = false;
+      for (final group in rowGroups) {
+        final anchor = group.first.box!;
+        final box = line.box!;
+        final maxH = max(anchor.height, box.height);
+        final overlapX = min(anchor.right, box.right) - max(anchor.left, box.left);
+        final minW = min(anchor.width, box.width);
+        final isHorizontallyStacked = minW > 0 && overlapX > minW * 0.25;
+        final tolerance = isHorizontallyStacked ? max(6.0, maxH * 0.45) : max(10.0, maxH * 0.85);
+        if ((box.center.dy - anchor.center.dy).abs() <= tolerance) {
+          group.add(line);
+          placed = true;
+          break;
+        }
+      }
+      if (!placed) {
+        rowGroups.add([line]);
+      }
+    }
+
+    return rowGroups.map((group) {
+      group.sort((a, b) => a.box!.left.compareTo(b.box!.left));
+      return group.map((l) => l.text.trim()).join(' ');
+    }).toList();
+  }
+
+  String _sanitizeNonWeightText(String normalizedText) {
+    if (normalizedText.isEmpty) return '';
+    String clean = normalizedText;
+    // 1. Loại ngày tháng (dd.mm.yyyy, dd/mm/yyyy, yyyy-mm-dd...)
+    clean = clean.replaceAll(RegExp(r'\b\d{1,2}[./-]\d{1,2}[./-]\d{2,4}\b'), ' ');
+    clean = clean.replaceAll(RegExp(r'\b\d{4}[./-]\d{1,2}[./-]\d{1,2}\b'), ' ');
+    // 2. Loại mã vạch dài / cụm mã EAN nhiều nhóm (VD: 2 110010 003088)
+    clean = clean.replaceAll(RegExp(r'\b\d{1,2}\s+\d{5,}\s+\d{5,}\b'), ' ');
+    clean = clean.replaceAll(RegExp(r'\b\d{6,}\b'), ' ');
+    // 3. Loại đơn giá kèm đơn vị tính (VD: 25.000 d/100g, 120.000/kg)
+    clean = clean.replaceAll(
+      RegExp(r'(?:don\s*gia|gia)?[^\w\n]{0,5}\d+(?:[.,]\d+)?\s*(?:d|vnd|dong)?\s*/\s*(?:100\s*g|kg|g)\b'),
+      ' ',
+    );
+    // 4. Loại số tiền và chỉ số không phải khối lượng (VD: 37.268 vnd, 150 kcal, 12%)
+    clean = clean.replaceAll(RegExp(r'\b\d+(?:[.,]\d+)?\s*(?:vnd|dong|kcal|cal|calo|kj)\b'), ' ');
+    clean = clean.replaceAll(RegExp(r'\b\d+(?:[.,]\d+)?\s*%'), ' ');
+    // 5. Loại đúng 1 giá trị tiền/ngày đứng ngay sau từ khóa giá/thành tiền/ngày (không nuốt sang phần KL)
+    clean = clean.replaceAll(
+      RegExp(
+        r'\b(?:don\s*gia|thanh\s*tien|tong\s*tien|tien\s*hang|gia\s*ban|ngay\s*dong\s*goi|ngay\s*sx|nsx|hsd|han\s*su\s*dung)\b[^\d\n]{0,15}(?:\d+(?:[.,]\d+)?\s*(?:vnd|dong|d\b)?\s*(?:/\s*(?:100\s*g|kg|g)\b)?)?',
+      ),
+      ' ',
+    );
+    return clean;
+  }
+
+  String? _extractByKeyword(String text) {
+    for (final m in _weightKeywordRegex.allMatches(text)) {
+      final numRaw = m.group(2) ?? '';
+      final numStr = numRaw.replaceAll(',', '.');
+      if ('.'.allMatches(numStr).length > 1) continue;
+      double? val = double.tryParse(numStr);
+      if (val == null) continue;
+
+      if (!numRaw.contains('.') && !numRaw.contains(',') && numStr.length >= 4 && numStr.startsWith('0')) {
+        val = val / 1000.0;
+      }
+      if (val >= 0.001 && val <= 50000) {
+        final String? explicitUnit = m.group(3) ?? m.group(1);
+        return _formatWeightToken(val, _resolveUnitToken(val, explicitUnit));
+      }
+    }
+    return null;
+  }
+
+  String? _extractByUnit(String text, {String? fallbackUnit}) {
+    final patternUnit = RegExp(r'(?<![a-zA-Z])(\d+(?:[.,]\d+)?)\s*(kg|gram|gr|g|k)(?![a-zA-Z])', caseSensitive: false);
+    for (final m in patternUnit.allMatches(text)) {
+      final numStr = m.group(1)!.replaceAll(',', '.');
+      if ('.'.allMatches(numStr).length > 1) continue;
+      final double? val = double.tryParse(numStr);
+      if (val == null || val < 0.01 || val > 50000) continue;
+
+      final rawUnit = m.group(2);
+      if (rawUnit != null && rawUnit.toLowerCase() == 'k' && val >= 15) {
+        // Tránh nhầm giá tiền dạng "25k" thành 25KG
+        continue;
+      }
+      return _formatWeightToken(val, _resolveUnitToken(val, rawUnit ?? fallbackUnit));
+    }
+    return null;
+  }
+
+  String? _extractBareNumber(String text, {String? forcedUnit}) {
+    final numbers = RegExp(r'(?<![a-zA-Z])(\d+(?:[.,]\d+)?)(?![a-zA-Z])').allMatches(text);
+    for (final m in numbers) {
+      final rawToken = m.group(1)!;
+      final numStr = rawToken.replaceAll(',', '.');
+      if ('.'.allMatches(numStr).length > 1) continue;
+      double? val = double.tryParse(numStr);
+      if (val == null) continue;
+
+      if (val > 1000 && rawToken.endsWith('9') && rawToken.length <= 4) {
+        val = (val - 9) / 10;
+      }
+      if (val > 0 && val <= 5000) {
+        if (rawToken.length == 3 && rawToken.startsWith('0') && val < 100) {
+          val = val / 100.0;
+        }
+        return _formatWeightToken(val, _resolveUnitToken(val, forcedUnit));
+      }
+    }
+    return null;
+  }
+
+  String _postProcessWeightToken(String token) {
+    return token.replaceAll(RegExp(r'9G$', caseSensitive: false), 'G');
   }
 
   String _formatWeightToken(double value, String unit) {
@@ -371,54 +508,8 @@ class AIHelper {
   String _resolveUnitToken(double value, String? rawUnit) {
     if (rawUnit == null) return (value < 15) ? 'KG' : 'G';
     final upper = rawUnit.toUpperCase();
-    return upper == 'K' ? 'KG' : upper;
-  }
-
-  String? _extractByRegex(String vanBanTho) {
-    if (vanBanTho.isEmpty) return null;
-
-    String vanBanSach = vanBanTho.replaceAll(RegExp(r'\b\d+[.,]\d+[.,]\d+\b'), '');
-    vanBanSach = vanBanSach.replaceAll(RegExp(r'\b\d{6,}\b'), '');
-    // Loại trừ đơn giá kèm quy cách tính (VD: 25000d/100g hoặc /kg)
-    vanBanSach = vanBanSach.replaceAll(RegExp(r'(?:don\s*gia|gia)?[^\w]{0,5}\d+[.,\d]*\s*(?:d|vnd|dong)?\s*/\s*(?:100g|kg|g)', caseSensitive: false), '');
-
-    final patternKw = RegExp(r'(?:khoi luong|trong luong|kl|tl)\s*(?:tinh)?[^\d]{0,15}?(\d+(?:[.,]\d+)?)\s*(g|kg|gr|k)?', caseSensitive: false);
-    for (final m in patternKw.allMatches(vanBanSach)) {
-      try {
-        double so = double.parse(m.group(1)!.replaceAll(',', '.'));
-        if (so > 0 && so <= 50000) {
-          return _formatWeightToken(so, _resolveUnitToken(so, m.groupCount >= 2 ? m.group(2) : null));
-        }
-      } catch (_) {}
-    }
-
-    final patternUnit = RegExp(r'(?<![a-zA-Z])(\d+(?:[.,]\d+)?)\s*(g|kg|gr|k)(?![a-zA-Z])', caseSensitive: false);
-    for (final m in patternUnit.allMatches(vanBanSach)) {
-      try {
-        double so = double.parse(m.group(1)!.replaceAll(',', '.'));
-        if (so >= 0.01 && so <= 50000) {
-          return _formatWeightToken(so, _resolveUnitToken(so, m.groupCount >= 2 ? m.group(2) : null));
-        }
-      } catch (_) {}
-    }
-
-    final numbers = RegExp(r'(?<![a-zA-Z])(\d+(?:[.,]\d+)?)(?![a-zA-Z])').allMatches(vanBanSach);
-    for (final m in numbers) {
-      try {
-        double val = double.parse(m.group(1)!.replaceAll(',', '.'));
-        if (val > 1000 && m.group(1)!.endsWith('9') && m.group(1)!.length <= 4) {
-          val = (val - 9) / 10;
-        }
-
-        if (val > 0 && val <= 5000) {
-          if (m.group(1)!.length == 3 && m.group(1)!.startsWith('0') && val < 100) {
-            val = val / 100.0;
-          }
-          return _formatWeightToken(val, (val < 15) ? 'KG' : 'G');
-        }
-      } catch (_) {}
-    }
-
-    return null;
+    if (upper == 'K' || upper == 'KG') return 'KG';
+    if (upper == 'GR' || upper == 'GRAM' || upper == 'G') return 'G';
+    return upper;
   }
 }
