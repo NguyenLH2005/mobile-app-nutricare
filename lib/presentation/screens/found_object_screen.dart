@@ -17,6 +17,7 @@ import 'result_screen.dart';
 import 'edit_profile_screen.dart';
 import 'daily_progress_screen.dart';
 import '../widgets/full_screen_image.dart';
+import '../widgets/guest_locked_notice.dart';
 
 class EggOption {
   final String id;
@@ -211,6 +212,7 @@ class _FoundObjectScreenState extends ConsumerState<FoundObjectScreen> {
   }
 
   Future<void> _handleAddToMenu() async {
+    if (!ref.read(syncProvider).isLoggedIn) return;
     try {
       final now = DateTime.now();
       final todayStr = ScanHistory.formatDateYmd(now);
@@ -250,8 +252,22 @@ class _FoundObjectScreenState extends ConsumerState<FoundObjectScreen> {
     }
   }
 
+  Future<void> _syncCurrentScanAfterLogin() async {
+    if (!mounted) return;
+    final refreshed = await DatabaseHelper.instance.getScanByCreatedAt(_currentData.createdAt);
+    if (refreshed != null && mounted) {
+      final todayStr = ScanHistory.formatDateYmd(DateTime.now());
+      final scanDate = refreshed.logDate ?? ScanHistory.formatDateYmd(refreshed.createdAt);
+      setState(() {
+        _currentData = refreshed;
+        _suggestionText = refreshed.aiSuggestion;
+        _isAddedToMenu = refreshed.id != null && refreshed.isInMenu && scanDate == todayStr;
+      });
+    }
+  }
+
   Future<void> _fetchSuggestion() async {
-    if (_isLoadingSuggestion) return;
+    if (_isLoadingSuggestion || !ref.read(syncProvider).isLoggedIn) return;
 
     final profileState = ref.read(profileProvider);
     if (profileState.tdee == null || profileState.profile == null) {
@@ -1080,6 +1096,7 @@ class _FoundObjectScreenState extends ConsumerState<FoundObjectScreen> {
       f100: macros.fat,
       actualWeight: actualW,
     );
+    final bool isLoggedIn = ref.watch(syncProvider).isLoggedIn;
 
     return Scaffold(
       backgroundColor: const Color(0xFFF7F9FC),
@@ -1088,20 +1105,22 @@ class _FoundObjectScreenState extends ConsumerState<FoundObjectScreen> {
         elevation: 0,
         title: const Text('Kết quả quét', style: TextStyle(color: Colors.black87, fontWeight: FontWeight.bold)),
         iconTheme: const IconThemeData(color: Colors.black87),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.pie_chart_outline, color: Colors.green),
-            tooltip: 'Tiến trình dinh dưỡng ngày',
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => DailyProgressScreen(initialDate: _currentData.logDate),
+        actions: isLoggedIn
+            ? [
+                IconButton(
+                  icon: const Icon(Icons.pie_chart_outline, color: Colors.green),
+                  tooltip: 'Tiến trình dinh dưỡng ngày',
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => DailyProgressScreen(initialDate: _currentData.logDate),
+                      ),
+                    );
+                  },
                 ),
-              );
-            },
-          ),
-        ],
+              ]
+            : null,
       ),
       body: SingleChildScrollView(
         child: Padding(
@@ -1377,27 +1396,29 @@ class _FoundObjectScreenState extends ConsumerState<FoundObjectScreen> {
                       ),
                     ],
 
-                    const SizedBox(height: 14),
+                    if (isLoggedIn) ...[
+                      const SizedBox(height: 14),
 
-                    // Nút Thêm vào thực đơn hôm nay
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton.icon(
-                        onPressed: _handleAddToMenu,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: _isAddedToMenu ? Colors.green.shade700 : const Color(0xFF1B233A),
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                          elevation: 0,
-                        ),
-                        icon: Icon(_isAddedToMenu ? Icons.check_circle_outline : Icons.add_circle_outline, size: 18),
-                        label: Text(
-                          _isAddedToMenu ? '✓ Đã có trong thực đơn hôm nay' : 'Thêm vào thực đơn hôm nay',
-                          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+                      // Nút Thêm vào thực đơn hôm nay
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton.icon(
+                          onPressed: _handleAddToMenu,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: _isAddedToMenu ? Colors.green.shade700 : const Color(0xFF1B233A),
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                            elevation: 0,
+                          ),
+                          icon: Icon(_isAddedToMenu ? Icons.check_circle_outline : Icons.add_circle_outline, size: 18),
+                          label: Text(
+                            _isAddedToMenu ? '✓ Đã có trong thực đơn hôm nay' : 'Thêm vào thực đơn hôm nay',
+                            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+                          ),
                         ),
                       ),
-                    ),
+                    ],
                   ],
                 ),
               ),
@@ -1457,34 +1478,45 @@ class _FoundObjectScreenState extends ConsumerState<FoundObjectScreen> {
                     'TƯ VẤN DINH DƯỠNG',
                     style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.green),
                   ),
-                  TextButton.icon(
-                    onPressed: _isLoadingSuggestion ? null : _fetchSuggestion,
-                    icon: _isLoadingSuggestion
-                        ? const SizedBox(
-                            width: 14,
-                            height: 14,
-                            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.green),
-                          )
-                        : const Icon(Icons.refresh, size: 18, color: Colors.green),
-                    label: const Text(
-                      'Cập nhật',
-                      style: TextStyle(
-                        color: Colors.green,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 14,
+                  if (isLoggedIn)
+                    TextButton.icon(
+                      onPressed: _isLoadingSuggestion ? null : _fetchSuggestion,
+                      icon: _isLoadingSuggestion
+                          ? const SizedBox(
+                              width: 14,
+                              height: 14,
+                              child: CircularProgressIndicator(strokeWidth: 2, color: Colors.green),
+                            )
+                          : const Icon(Icons.refresh, size: 18, color: Colors.green),
+                      label: const Text(
+                        'Cập nhật',
+                        style: TextStyle(
+                          color: Colors.green,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                        ),
+                      ),
+                      style: TextButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        backgroundColor: Colors.green.withValues(alpha: 0.08),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                       ),
                     ),
-                    style: TextButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                      backgroundColor: Colors.green.withValues(alpha: 0.08),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                    ),
-                  ),
                 ],
               ),
               const SizedBox(height: 10),
               Builder(
                 builder: (ctx) {
+                  if (!isLoggedIn) {
+                    return GuestLockedNotice(
+                      compact: true,
+                      title: 'Đăng nhập để mở khóa Tư vấn AI',
+                      description:
+                          'Chuyên gia AI cần đăng nhập Google và hồ sơ cá nhân để đánh giá món ăn theo thể trạng và bệnh lý của bạn.',
+                      onSignedIn: _syncCurrentScanAfterLogin,
+                    );
+                  }
+
                   final profileState = ref.watch(profileProvider);
                   if (profileState.tdee == null || profileState.profile == null) {
                     return InkWell(
@@ -1677,31 +1709,33 @@ class _FoundObjectScreenState extends ConsumerState<FoundObjectScreen> {
               ),
               const SizedBox(height: 20),
 
-              // NÚT CHUYỂN SANG TIẾN TRÌNH DINH DƯỠNG NGÀY
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton.icon(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.green,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  ),
-                  onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => DailyProgressScreen(initialDate: _currentData.logDate),
-                      ),
-                    );
-                  },
-                  icon: const Icon(Icons.pie_chart_outline),
-                  label: const Text(
-                    'Xem Tiến trình Dinh dưỡng Ngày Hôm Nay',
-                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+              if (isLoggedIn) ...[
+                // NÚT CHUYỂN SANG TIẾN TRÌNH DINH DƯỠNG NGÀY
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.green,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => DailyProgressScreen(initialDate: _currentData.logDate),
+                        ),
+                      );
+                    },
+                    icon: const Icon(Icons.pie_chart_outline),
+                    label: const Text(
+                      'Xem Tiến trình Dinh dưỡng Ngày Hôm Nay',
+                      style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+                    ),
                   ),
                 ),
-              ),
+              ],
               const SizedBox(height: 40),
             ],
           ),

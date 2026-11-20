@@ -10,6 +10,7 @@ import '../state/sync_controller.dart';
 import 'found_object_screen.dart';
 import 'edit_profile_screen.dart';
 import '../widgets/scan_thumbnail.dart';
+import '../widgets/guest_locked_notice.dart';
 
 class DailyProgressScreen extends ConsumerStatefulWidget {
   final String? initialDate;
@@ -55,6 +56,12 @@ class _DailyProgressScreenState extends ConsumerState<DailyProgressScreen> {
   }
 
   Future<void> _loadDailyScans() async {
+    if (!ref.read(syncProvider).isLoggedIn) {
+      if (mounted && _isLoading) {
+        setState(() => _isLoading = false);
+      }
+      return;
+    }
     setState(() => _isLoading = true);
     final scans = await DatabaseHelper.instance.getDailyScans(_dateStr);
     if (mounted) {
@@ -164,6 +171,45 @@ class _DailyProgressScreenState extends ConsumerState<DailyProgressScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final syncState = ref.watch(syncProvider);
+
+    ref.listen<AuthUserState>(syncProvider, (prev, next) {
+      if (next.isLoggedIn &&
+          (prev?.isLoggedIn != true || (prev?.isSyncing == true && !next.isSyncing))) {
+        _loadDailyScans();
+      }
+    });
+    ref.listen<AsyncValue<List<ScanHistory>>>(historyProvider, (prev, next) {
+      if (next.hasValue && ref.read(syncProvider).isLoggedIn) {
+        _loadDailyScans();
+      }
+    });
+
+    if (!syncState.isLoggedIn) {
+      return Scaffold(
+        backgroundColor: const Color(0xFFF7F9FB),
+        appBar: AppBar(
+          title: const Text(
+            'Tiến trình Dinh dưỡng Ngày',
+            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+          ),
+          backgroundColor: Colors.white,
+          foregroundColor: const Color(0xFF1B233A),
+          elevation: 0.5,
+        ),
+        body: const GuestLockedNotice(
+          title: 'Tiến trình ngày cần đăng nhập',
+          description:
+              'Đăng nhập bằng Google để mở khóa thực đơn theo ngày, theo dõi tiến độ dinh dưỡng và cảnh báo y khoa cá nhân hóa.',
+          lockedItems: [
+            'Thống kê tổng Năng lượng, Đạm, Béo, Carb và Chất xơ theo ngày',
+            'Theo dõi trần giới hạn Natri, Đường, Kali, Photpho theo bệnh lý',
+            'Lưu thực đơn ngày và đồng bộ an toàn lên đám mây',
+          ],
+        ),
+      );
+    }
+
     final profileState = ref.watch(profileProvider);
     final profile = profileState.profile;
 
@@ -947,7 +993,7 @@ class _DailyProgressScreenState extends ConsumerState<DailyProgressScreen> {
                 child: _buildEquivItem(
                   title: 'Phần Đạm',
                   count: equivProtein,
-                  example: '≈ 1 quả trứng hoặc 80g thịt heo',
+                  example: '1 phần đạm ≈ 7g protein',
                   color: Colors.purple,
                 ),
               ),
@@ -956,7 +1002,7 @@ class _DailyProgressScreenState extends ConsumerState<DailyProgressScreen> {
                 child: _buildEquivItem(
                   title: 'Phần Tinh bột',
                   count: equivCarb,
-                  example: '≈ 1/2 bát cơm hoặc 1 củ khoai tây',
+                  example: '1 phần tinh bột ≈ 20g carb',
                   color: Colors.blue,
                 ),
               ),
@@ -965,7 +1011,7 @@ class _DailyProgressScreenState extends ConsumerState<DailyProgressScreen> {
                 child: _buildEquivItem(
                   title: 'Phần Béo',
                   count: equivFat,
-                  example: '≈ 1 thìa dầu ăn hoặc 10g các loại hạt',
+                  example: '1 phần béo ≈ 5g fat',
                   color: Colors.orange,
                 ),
               ),

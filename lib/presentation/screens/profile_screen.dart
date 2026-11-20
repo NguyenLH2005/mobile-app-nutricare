@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/models/user_profile_model.dart';
 import '../state/profile_controller.dart';
 import '../state/sync_controller.dart';
+import '../widgets/guest_locked_notice.dart';
 import 'edit_profile_screen.dart';
 
 class ProfileScreen extends ConsumerStatefulWidget {
@@ -77,8 +78,32 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final profileState = ref.watch(profileProvider);
     final syncState = ref.watch(syncProvider);
+    if (!syncState.isLoggedIn) {
+      return Scaffold(
+        backgroundColor: const Color(0xFFF7F9FC),
+        appBar: AppBar(
+          title: const Text(
+            'Hồ Sơ Cá Nhân',
+            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+          ),
+          backgroundColor: Colors.green,
+          elevation: 0,
+        ),
+        body: const GuestLockedNotice(
+          title: 'Hồ sơ cá nhân đang được khóa',
+          description:
+              'Đăng nhập bằng Google để thiết lập thể trạng, bệnh lý nền và đồng bộ dữ liệu sức khỏe của bạn.',
+          lockedItems: [
+            'Thiết lập chiều cao, cân nặng, mức vận động và mục tiêu dinh dưỡng',
+            'Tính toán BMR, TDEE, ngân sách đa lượng và ngưỡng an toàn bệnh lý',
+            'Sao lưu và khôi phục hồ sơ cùng lịch sử quét trên mọi thiết bị',
+          ],
+        ),
+      );
+    }
+
+    final profileState = ref.watch(profileProvider);
     final profile = profileState.profile;
 
     return Scaffold(

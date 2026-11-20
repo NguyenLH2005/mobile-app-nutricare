@@ -1,20 +1,22 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'scan_screen.dart';
 import 'daily_progress_screen.dart';
 import 'history_screen.dart';
 import 'profile_screen.dart';
+import '../state/sync_controller.dart';
 
-class MainScreen extends StatefulWidget {
+class MainScreen extends ConsumerStatefulWidget {
   final int initialIndex;
 
   const MainScreen({super.key, this.initialIndex = 0});
 
   @override
-  State<MainScreen> createState() => _MainScreenState();
+  ConsumerState<MainScreen> createState() => _MainScreenState();
 }
 
-class _MainScreenState extends State<MainScreen> {
+class _MainScreenState extends ConsumerState<MainScreen> {
   late int _currentIndex;
 
   // Danh sách 4 màn hình chính tương ứng với 4 Tab
@@ -31,8 +33,32 @@ class _MainScreenState extends State<MainScreen> {
     _currentIndex = widget.initialIndex;
   }
 
+  Widget _buildTabIcon(IconData icon, {bool locked = false}) {
+    if (!locked) return Icon(icon);
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        Icon(icon),
+        Positioned(
+          right: -6,
+          top: -4,
+          child: Container(
+            padding: const EdgeInsets.all(1.5),
+            decoration: const BoxDecoration(
+              color: Colors.white,
+              shape: BoxShape.circle,
+            ),
+            child: Icon(Icons.lock, size: 11, color: Colors.orange.shade700),
+          ),
+        ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    final bool isLocked = !ref.watch(syncProvider).isLoggedIn;
+
     return Scaffold(
       body: IndexedStack(index: _currentIndex, children: _screens),
       bottomNavigationBar: BottomNavigationBar(
@@ -45,21 +71,21 @@ class _MainScreenState extends State<MainScreen> {
         },
         selectedItemColor: Colors.green,
         unselectedItemColor: Colors.grey,
-        items: const [
-          BottomNavigationBarItem(
+        items: [
+          const BottomNavigationBarItem(
             icon: Icon(Icons.qr_code_scanner),
             label: 'Tra cứu',
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.pie_chart_outline),
+            icon: _buildTabIcon(Icons.pie_chart_outline, locked: isLocked),
             label: 'Tiến trình',
           ),
-          BottomNavigationBarItem(
+          const BottomNavigationBarItem(
             icon: Icon(Icons.history),
             label: 'Lịch sử',
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.person),
+            icon: _buildTabIcon(Icons.person, locked: isLocked),
             label: 'Hồ sơ',
           ),
         ],

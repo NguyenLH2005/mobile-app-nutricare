@@ -64,8 +64,8 @@ class AuthGate extends ConsumerWidget {
       );
     }
 
-    // Nếu đã đăng nhập -> Vào thẳng màn hình chính
-    if (syncState.isLoggedIn) {
+    // Nếu đã đăng nhập hoặc đang dùng chế độ khách -> Vào màn hình chính
+    if (syncState.isLoggedIn || syncState.isGuest) {
       return const MainScreen();
     }
 

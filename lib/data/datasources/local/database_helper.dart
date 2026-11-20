@@ -201,6 +201,42 @@ class DatabaseHelper {
     );
   }
 
+  Future<int?> getMaxScanId() async {
+    final db = await instance.database;
+    final res = await db.rawQuery('SELECT MAX(id) AS max_id FROM scan_history');
+    if (res.isEmpty) return null;
+    final val = res.first['max_id'];
+    return val is int ? val : (val as num?)?.toInt();
+  }
+
+  /// Đổi ID cục bộ cho bản ghi khách khi gộp vào tài khoản đã có trùng local_id trên Cloud.
+  Future<void> reassignScanIds(Map<int, int> idMapping) async {
+    if (idMapping.isEmpty) return;
+    final db = await instance.database;
+    await db.transaction((txn) async {
+      for (final entry in idMapping.entries) {
+        await txn.update(
+          'scan_history',
+          {'id': entry.value},
+          where: 'id = ?',
+          whereArgs: [entry.key],
+        );
+      }
+    });
+  }
+
+  Future<ScanHistory?> getScanByCreatedAt(DateTime createdAt) async {
+    final db = await instance.database;
+    final res = await db.query(
+      'scan_history',
+      where: 'created_at = ?',
+      whereArgs: [createdAt.toIso8601String()],
+      limit: 1,
+    );
+    if (res.isEmpty) return null;
+    return ScanHistory.fromMap(res.first);
+  }
+
   // --- SYNC HELPERS ---
   Future<List<ScanHistory>> getUnsyncedScans() async {
     final db = await instance.database;

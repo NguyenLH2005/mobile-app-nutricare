@@ -16,6 +16,7 @@ import 'profile_controller.dart';
 class AuthUserState {
   final bool isInitialized;
   final bool isLoggedIn;
+  final bool isGuest;
   final String? email;
   final String? name;
   final String? avatarUrl;
@@ -25,6 +26,7 @@ class AuthUserState {
   AuthUserState({
     this.isInitialized = false,
     this.isLoggedIn = false,
+    this.isGuest = false,
     this.email,
     this.name,
     this.avatarUrl,
@@ -35,25 +37,30 @@ class AuthUserState {
   AuthUserState copyWith({
     bool? isInitialized,
     bool? isLoggedIn,
+    bool? isGuest,
     String? email,
     String? name,
     String? avatarUrl,
     bool? isSyncing,
     String? syncMessage,
+    bool clearSyncMessage = false,
   }) {
     return AuthUserState(
       isInitialized: isInitialized ?? this.isInitialized,
       isLoggedIn: isLoggedIn ?? this.isLoggedIn,
+      isGuest: isGuest ?? this.isGuest,
       email: email ?? this.email,
       name: name ?? this.name,
       avatarUrl: avatarUrl ?? this.avatarUrl,
       isSyncing: isSyncing ?? this.isSyncing,
-      syncMessage: syncMessage ?? this.syncMessage,
+      syncMessage: clearSyncMessage ? null : (syncMessage ?? this.syncMessage),
     );
   }
 }
 
 class SyncController extends Notifier<AuthUserState> {
+  static const String _guestModePrefKey = 'is_guest_mode';
+
   // Web Client ID lấy từ Google Cloud Console (Client ID for Web application)
   static const String googleClientId = '601892342101-l6hu54kc9g71rnkjaevar6fauum54lg3.apps.googleusercontent.com';
 
@@ -75,9 +82,11 @@ class SyncController extends Notifier<AuthUserState> {
     if (token != null && userJson != null) {
       try {
         final Map<String, dynamic> userMap = jsonDecode(userJson);
+        await prefs.remove(_guestModePrefKey);
         state = state.copyWith(
           isInitialized: true,
           isLoggedIn: true,
+          isGuest: false,
           email: userMap['email'],
           name: userMap['name'],
           avatarUrl: userMap['avatarUrl'],
@@ -97,9 +106,11 @@ class SyncController extends Notifier<AuthUserState> {
           final user = await ApiService.instance.loginWithGoogle(auth.idToken!);
           if (user != null) {
             await prefs.setString('cached_user_profile', jsonEncode(user));
+            await prefs.remove(_guestModePrefKey);
             state = state.copyWith(
               isInitialized: true,
               isLoggedIn: true,
+              isGuest: false,
               email: user['email'],
               name: user['name'],
               avatarUrl: user['avatarUrl'],
@@ -111,7 +122,25 @@ class SyncController extends Notifier<AuthUserState> {
       }
     } catch (_) {}
 
-    state = state.copyWith(isInitialized: true, isLoggedIn: false);
+    final isGuest = prefs.getBool(_guestModePrefKey) ?? false;
+    state = state.copyWith(
+      isInitialized: true,
+      isLoggedIn: false,
+      isGuest: isGuest,
+    );
+  }
+
+  /// Cho phép bỏ qua bước đăng nhập để sử dụng chế độ khách (Tra cứu & Lịch sử cục bộ).
+  Future<void> continueAsGuest() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_guestModePrefKey, true);
+    state = state.copyWith(
+      isInitialized: true,
+      isLoggedIn: false,
+      isGuest: true,
+      isSyncing: false,
+      clearSyncMessage: true,
+    );
   }
 
   // Đăng nhập bằng Google
@@ -125,7 +154,7 @@ class SyncController extends Notifier<AuthUserState> {
 
       final GoogleSignInAccount? account = await _googleSignIn.signIn();
       if (account == null) {
-        state = state.copyWith(isSyncing: false, syncMessage: null);
+        state = state.copyWith(isSyncing: false, clearSyncMessage: true);
         return false; // Người dùng hủy
       }
 
@@ -142,10 +171,12 @@ class SyncController extends Notifier<AuthUserState> {
       if (user != null) {
         final prefs = await SharedPreferences.getInstance();
         await prefs.setString('cached_user_profile', jsonEncode(user));
+        await prefs.remove(_guestModePrefKey);
 
         state = state.copyWith(
           isInitialized: true,
           isLoggedIn: true,
+          isGuest: false,
           email: user['email'],
           name: user['name'],
           avatarUrl: user['avatarUrl'],
@@ -153,8 +184,9 @@ class SyncController extends Notifier<AuthUserState> {
           syncMessage: 'Đăng nhập thành công!',
         );
 
-        // Đăng nhập thành công -> Tự động khôi phục dữ liệu từ Cloud về máy
+        // Khôi phục dữ liệu Cloud về máy trước, xử lý trùng ID nếu có, rồi gộp dữ liệu khách lên Cloud
         await restoreFromCloud();
+        await syncNow();
         return true;
       } else {
         state = state.copyWith(isSyncing: false, syncMessage: 'Máy chủ từ chối xác thực.');
@@ -183,6 +215,7 @@ class SyncController extends Notifier<AuthUserState> {
     await ApiService.instance.clearAuthToken();
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove('cached_user_profile');
+    await prefs.remove(_guestModePrefKey);
 
     // Xóa sạch CSDL SQLite trên máy
     await DatabaseHelper.instance.clearAllLocalData();
@@ -192,6 +225,7 @@ class SyncController extends Notifier<AuthUserState> {
     state = AuthUserState(
       isInitialized: true,
       isLoggedIn: false,
+      isGuest: false,
       syncMessage: null,
     );
   }
@@ -256,7 +290,7 @@ class SyncController extends Notifier<AuthUserState> {
           'foodImageBase64': foodBase64,
           'labelImageBase64': labelBase64,
           'aiSuggestion': s.aiSuggestion,
-          'createdAt': s.createdAt.toIso8601String(),
+          'createdAt': s.createdAt.toUtc().toIso8601String(),
         });
       }
 
@@ -314,19 +348,34 @@ class SyncController extends Notifier<AuthUserState> {
           ref.read(profileProvider.notifier).loadProfile();
         }
 
-        // 2. Phục hồi lịch sử quét nếu có
+        // 2. Phục hồi lịch sử quét nếu có (gộp an toàn với lịch sử quét khi chưa đăng nhập)
         if (data['scans'] != null && data['scans'] is List) {
           final scansList = data['scans'] as List;
           final existingScans = await DatabaseHelper.instance.getAllScans();
-          final existingTimestamps = existingScans.map((e) => e.createdAt.toIso8601String()).toSet();
+          final existingTimestamps =
+              existingScans.map((e) => e.createdAt.toIso8601String()).toSet();
+          final existingUtcMillis =
+              existingScans.map((e) => e.createdAt.toUtc().millisecondsSinceEpoch).toSet();
+          final cloudLocalIds = <int>{};
+          int maxCloudLocalId = 0;
 
           for (var s in scansList) {
+            final rawLocalId = s['local_id'] ?? s['localId'];
+            final parsedLocalId =
+                rawLocalId is int ? rawLocalId : int.tryParse(rawLocalId?.toString() ?? '');
+            if (parsedLocalId != null) {
+              cloudLocalIds.add(parsedLocalId);
+              if (parsedLocalId > maxCloudLocalId) maxCloudLocalId = parsedLocalId;
+            }
+
             final createdAtStr = s['created_at']?.toString();
             final createdAt = createdAtStr != null 
                 ? DateTime.tryParse(createdAtStr) ?? DateTime.now() 
                 : DateTime.now();
 
-            if (createdAtStr != null && existingTimestamps.contains(createdAt.toIso8601String())) {
+            if (createdAtStr != null &&
+                (existingTimestamps.contains(createdAt.toIso8601String()) ||
+                    existingUtcMillis.contains(createdAt.toUtc().millisecondsSinceEpoch))) {
               continue; // Tránh trùng lặp nếu đã có món ăn này
             }
 
@@ -391,6 +440,11 @@ class SyncController extends Notifier<AuthUserState> {
             );
             await DatabaseHelper.instance.insertScan(scan);
           }
+          await _reassignCollidingGuestScans(
+            existingScans,
+            cloudLocalIds,
+            maxCloudLocalId,
+          );
           ref.invalidate(historyProvider);
         }
 
@@ -402,6 +456,27 @@ class SyncController extends Notifier<AuthUserState> {
     }
     state = state.copyWith(isSyncing: false);
     return false;
+  }
+
+  /// Tránh đè bản ghi cũ trên Cloud nếu bản ghi quét ở chế độ khách có cùng SQLite id với Cloud.
+  Future<void> _reassignCollidingGuestScans(
+    List<ScanHistory> preExistingScans,
+    Set<int> cloudLocalIds,
+    int maxCloudLocalId,
+  ) async {
+    if (cloudLocalIds.isEmpty) return;
+    final colliding = preExistingScans
+        .where((s) => s.id != null && s.isSynced == 0 && cloudLocalIds.contains(s.id!))
+        .toList();
+    if (colliding.isEmpty) return;
+
+    final maxLocalId = await DatabaseHelper.instance.getMaxScanId() ?? 0;
+    var nextSafeId = (maxCloudLocalId > maxLocalId ? maxCloudLocalId : maxLocalId) + 1;
+    final mapping = <int, int>{};
+    for (final scan in colliding) {
+      mapping[scan.id!] = nextSafeId++;
+    }
+    await DatabaseHelper.instance.reassignScanIds(mapping);
   }
 
   double? _parseNullableNum(dynamic val) {

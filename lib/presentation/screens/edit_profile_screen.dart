@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/models/user_profile_model.dart';
 import '../state/profile_controller.dart';
 import '../state/sync_controller.dart';
+import '../widgets/guest_locked_notice.dart';
 
 class EditProfileScreen extends ConsumerStatefulWidget {
   const EditProfileScreen({super.key});
@@ -137,6 +138,25 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isLoggedIn = ref.watch(syncProvider).isLoggedIn;
+    if (!isLoggedIn) {
+      return Scaffold(
+        backgroundColor: const Color(0xFFF7F9FC),
+        appBar: AppBar(
+          title: const Text(
+            'Thiết Lập Hồ Sơ',
+            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+          ),
+          backgroundColor: Colors.green,
+          elevation: 1,
+        ),
+        body: const GuestLockedNotice(
+          title: 'Cần đăng nhập để chỉnh sửa hồ sơ',
+          description: 'Vui lòng đăng nhập bằng Google để tạo hoặc cập nhật thông tin hồ sơ dinh dưỡng của bạn.',
+        ),
+      );
+    }
+
     final currentBmi = _calculateCurrentBmi();
     final bool hasGoalConflict =
         currentBmi != null && UserProfile.hasGoalConflictWithBmi(currentBmi, _goal);

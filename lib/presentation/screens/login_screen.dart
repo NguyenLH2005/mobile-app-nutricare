@@ -161,13 +161,37 @@ class LoginScreen extends ConsumerWidget {
                           ),
                   ),
                 ),
+                const SizedBox(height: 12),
+
+                // 5. Nút dùng thử không cần đăng nhập (Chế độ Khách)
+                SizedBox(
+                  width: double.infinity,
+                  height: 48,
+                  child: OutlinedButton.icon(
+                    onPressed: syncState.isSyncing
+                        ? null
+                        : () => ref.read(syncProvider.notifier).continueAsGuest(),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: Colors.green.shade800,
+                      side: BorderSide(color: Colors.green.shade300, width: 1.2),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(28),
+                      ),
+                    ),
+                    icon: const Icon(Icons.person_outline_rounded, size: 20),
+                    label: const Text(
+                      'Tiếp tục không cần đăng nhập',
+                      style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+                    ),
+                  ),
+                ),
                 const SizedBox(height: 20),
 
-                // 5. Ghi chú bảo mật
+                // 6. Ghi chú phân quyền tính năng
                 Text(
-                  'Đăng nhập giúp đồng bộ bảo mật hồ sơ và lịch sử tra cứu của bạn trên mọi thiết bị.',
+                  'Không đăng nhập vẫn dùng được Tra cứu thực phẩm và Lịch sử trên máy. Đăng nhập Google để mở khóa Tư vấn AI, Hồ sơ, Tiến trình ngày và đồng bộ đám mây.',
                   textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
+                  style: TextStyle(fontSize: 12, color: Colors.grey.shade500, height: 1.4),
                 ),
               ],
             ),
