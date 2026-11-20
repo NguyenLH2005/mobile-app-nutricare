@@ -34,7 +34,6 @@ void main() {
       foodName: 'thịt gà - Ức gà công nghiệp',
       weight: 200,
       consumptionRatio: 0.5,
-      cookingMethod: 'Luộc',
       nutritionData: '[]',
       mainGroup: 'Chất đạm',
       createdAt: DateTime(2026, 11, 16, 12, 30),
@@ -57,6 +56,12 @@ void main() {
 
     final parts = repo.getPartsForLabel('Thịt gà');
     expect(parts.length, greaterThanOrEqualTo(2));
+    expect(parts, isNot(contains('Đùi gà ta')));
+    expect(repo.getPartsForLabel('Ngô'), isNot(contains('Ngô nếp')));
+    expect(repo.getPartsForLabel('Thịt vịt'), ['Cả con']);
+
+    expect(repo.findFoodByName('Hạnh nhân'), isNotNull);
+    expect(repo.findFoodByName('Óc chó'), isNotNull);
 
     final octopus = repo.findFoodByName('Bạch tuộc');
     expect(octopus, isNotNull);

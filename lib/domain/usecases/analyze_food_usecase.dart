@@ -66,7 +66,6 @@ class AnalyzeFoodUseCase {
         foodData,
         overrideLabel: isEgg ? null : detectedName,
       );
-      final String? initialCooking = foodData['cooking_method']?.toString().trim();
       final String mainGroup = foodData['Nhóm Dinh Dưỡng Chính']?.toString().trim() ?? 'Chưa phân loại';
 
       // 3. TÍNH TOÁN & ĐÓNG GÓI JSON
@@ -104,7 +103,6 @@ class AnalyzeFoodUseCase {
         servingUnits: servingUnits,
         consumptionRatio: 1.0,
         logDate: dateStr,
-        cookingMethod: (initialCooking != null && initialCooking.isNotEmpty) ? initialCooking : null,
         nutritionData: jsonNutritionData,
         mainGroup: mainGroup,
         createdAt: now,

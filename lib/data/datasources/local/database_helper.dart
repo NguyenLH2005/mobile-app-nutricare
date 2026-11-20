@@ -21,7 +21,7 @@ class DatabaseHelper {
 
     return await openDatabase(
       path,
-      version: 13,
+      version: 14,
       onCreate: _createDB,
       onUpgrade: (db, oldVersion, newVersion) async {
         if (oldVersion < 8) {
@@ -66,16 +66,39 @@ class DatabaseHelper {
             await db.execute("ALTER TABLE scan_history ADD COLUMN is_in_menu INTEGER NOT NULL DEFAULT 1");
           } catch (_) {}
         }
-        if (oldVersion < 13) {
-          try {
-            await db.execute("ALTER TABLE scan_history ADD COLUMN cooking_method TEXT");
-          } catch (_) {}
+        if (oldVersion < 14) {
+          await _dropCookingMethodColumnIfPresent(db);
         }
       },
     );
   }
 
-  Future _createDB(Database db, int version) async {
+  Future<void> _dropCookingMethodColumnIfPresent(Database db) async {
+    final cols = await db.rawQuery('PRAGMA table_info(scan_history)');
+    final hasCookingMethod = cols.any((c) => c['name'] == 'cooking_method');
+    if (!hasCookingMethod) return;
+
+    try {
+      await db.execute('ALTER TABLE scan_history DROP COLUMN cooking_method');
+    } catch (_) {
+      const keepCols =
+          'id, original_image, cropped_food_image, cropped_label_image, '
+          'original_image_base64, food_image_base64, label_image_base64, '
+          'ai_suggestion, food_name, weight, serving_units, consumption_ratio, '
+          'log_date, is_in_menu, nutrition_data, main_group, created_at, '
+          'is_synced, updated_at';
+      await db.transaction((txn) async {
+        await txn.execute('ALTER TABLE scan_history RENAME TO scan_history_old');
+        await _createScanHistoryTable(txn);
+        await txn.execute(
+          'INSERT INTO scan_history ($keepCols) SELECT $keepCols FROM scan_history_old',
+        );
+        await txn.execute('DROP TABLE scan_history_old');
+      });
+    }
+  }
+
+  Future<void> _createScanHistoryTable(DatabaseExecutor db) async {
     await db.execute('''
     CREATE TABLE scan_history (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -92,7 +115,6 @@ class DatabaseHelper {
       consumption_ratio REAL NOT NULL DEFAULT 1.0,
       log_date TEXT,
       is_in_menu INTEGER NOT NULL DEFAULT 0,
-      cooking_method TEXT,
       nutrition_data TEXT NOT NULL,
       main_group TEXT NOT NULL,
       created_at TEXT NOT NULL,
@@ -100,6 +122,10 @@ class DatabaseHelper {
       updated_at TEXT
     )
     ''');
+  }
+
+  Future _createDB(Database db, int version) async {
+    await _createScanHistoryTable(db);
 
     await db.execute('''
     CREATE TABLE user_profile (

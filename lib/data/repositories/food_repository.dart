@@ -135,7 +135,7 @@ class FoodRepository {
       if (partNorm.isNotEmpty && partNorm == norm) return row;
     }
 
-    // 4. Khớp theo food_label (ưu tiên Tươi/Nguyên bản nếu có)
+    // 4. Khớp theo food_label
     final labelRows = _rowsByLabel[norm];
     if (labelRows != null && labelRows.isNotEmpty) {
       return labelRows.first;
@@ -208,7 +208,7 @@ class FoodRepository {
     ];
 
     final coreKeys = [
-      'code', 'name_vi', 'food_label', 'part_name', 'cooking_method',
+      'code', 'name_vi', 'food_label', 'part_name',
       'Nhóm Dinh Dưỡng Chính', 'category',
       'Năng lượng', 'Chất đạm', 'Chất béo (Fat)', 'Chất bột đường', 'Chất xơ'
     ];
@@ -303,7 +303,7 @@ class FoodRepository {
   }
 
   // =========================================================================
-  // TRA CỨU PHẦN THỨC ĂN & PHƯƠNG PHÁP CHẾ BIẾN (từ food_label, part_name, cooking_method)
+  // TRA CỨU PHẦN THỨC ĂN (từ food_label, part_name)
   // =========================================================================
 
   String _mapToCsvLabel(String displayLabel) {
@@ -338,64 +338,19 @@ class FoodRepository {
     return bestKey ?? foodName.trim();
   }
 
-  /// Tra cứu dòng CSV chính xác tương ứng với bản ghi ScanHistory (không cần gắn ngoặc chế biến vào tên).
-  Map<String, dynamic>? resolveRowFromFoodName(
-    String foodName, {
-    String? cookingMethod,
-    List<dynamic>? decodedNutrition,
-  }) {
+  /// Tra cứu dòng CSV tương ứng với bản ghi ScanHistory (hỗ trợ cả dữ liệu cũ từng gắn hậu tố ngoặc).
+  Map<String, dynamic>? resolveRowFromFoodName(String foodName) {
     final norm = _normalizeString(foodName);
     if (norm.isEmpty) return null;
 
-    // Strip bất kỳ hậu tố "(Chế biến)" cũ nào từ lịch sử trước đây
+    // Tương thích ngược nếu bản ghi lịch sử cũ từng lưu hậu tố "(Chế biến)" ở cuối
     final strippedNorm = norm.replaceAll(RegExp(r'\s*\([^)]*\)$'), '').trim();
-    final cookNorm = cookingMethod != null ? _normalizeString(cookingMethod) : '';
 
-    // Tập ứng viên khớp theo tên hiển thị mới hoặc part_name
-    final candidates = <Map<String, dynamic>>[];
     for (final row in _allRows) {
       final displayNorm = _normalizeString(formatDisplayName(row));
-      final cook = row['cooking_method']?.toString().trim() ?? '';
-      final oldParen = cook.isNotEmpty ? _normalizeString('$displayNorm ($cook)') : displayNorm;
-      if (displayNorm == norm || displayNorm == strippedNorm || oldParen == norm) {
-        candidates.add(row);
+      if (displayNorm == norm || displayNorm == strippedNorm) {
+        return row;
       }
-    }
-
-    if (candidates.isNotEmpty) {
-      if (cookNorm.isNotEmpty) {
-        for (final row in candidates) {
-          if (_normalizeString(row['cooking_method']?.toString() ?? '') == cookNorm) {
-            return row;
-          }
-        }
-      }
-
-      // Nếu chưa có cookingMethod (bản ghi cũ), so khớp energy per_100g trong decodedNutrition
-      if (decodedNutrition != null && decodedNutrition.isNotEmpty) {
-        double? e100;
-        for (final item in decodedNutrition) {
-          if (item['id'] == 'energy') {
-            e100 = (item['per_100g'] as num?)?.toDouble();
-            break;
-          }
-        }
-        if (e100 != null) {
-          for (final row in candidates) {
-            final rowE = double.tryParse(row['Năng lượng']?.toString() ?? '');
-            if (rowE != null && (rowE - e100).abs() < 0.6) {
-              return row;
-            }
-          }
-        }
-      }
-
-      // Ưu tiên "Tươi" nếu có nhiều lựa chọn
-      for (final row in candidates) {
-        final c = _normalizeString(row['cooking_method']?.toString() ?? '');
-        if (c == 'tươi' || c == 'sống') return row;
-      }
-      return candidates.first;
     }
 
     // Fallback theo code, nhãn gốc, part_name hoặc tiền tố food_label
@@ -429,37 +384,19 @@ class FoodRepository {
     return parts;
   }
 
-  /// Danh sách các dòng CSV tương ứng với các phương pháp chế biến của một (nhãn, phần).
-  /// Luôn ưu tiên đưa "Tươi" lên đầu tiên nếu có.
-  List<Map<String, dynamic>> getCookingRowsForPart(String displayLabel, String partName) {
+  /// Tra cứu dòng CSV duy nhất tương ứng với cặp (nhãn, phần).
+  Map<String, dynamic>? findRowForPart(String displayLabel, String partName) {
     final rows = _rowsForDisplayLabel(displayLabel);
     final partTarget = partName.trim();
-
-    final matching = rows.where((r) {
-      final rowPart = r['part_name']?.toString().trim() ?? '';
-      return rowPart == partTarget;
-    }).toList();
-
-    matching.sort((a, b) {
-      final ca = _normalizeString(a['cooking_method']?.toString() ?? '');
-      final cb = _normalizeString(b['cooking_method']?.toString() ?? '');
-      final aIsFresh = ca == 'tươi' || ca == 'sống';
-      final bIsFresh = cb == 'tươi' || cb == 'sống';
-      if (aIsFresh && !bIsFresh) return -1;
-      if (!aIsFresh && bIsFresh) return 1;
-      return 0;
-    });
-
-    return matching;
+    for (final row in rows) {
+      if ((row['part_name']?.toString().trim() ?? '') == partTarget) {
+        return row;
+      }
+    }
+    return rows.isNotEmpty ? rows.first : null;
   }
 
-  /// Chọn dòng mặc định cho một phần khi đổi phần (ưu tiên "Tươi" nếu có).
-  Map<String, dynamic>? findPreferredRowForPart(String displayLabel, String partName) {
-    final options = getCookingRowsForPart(displayLabel, partName);
-    return options.isNotEmpty ? options.first : null;
-  }
-
-  /// Định dạng tên hiển thị chuẩn cho món ăn (gọn gàng, không mở ngoặc cách chế biến).
+  /// Định dạng tên hiển thị chuẩn cho món ăn.
   String formatDisplayName(Map<String, dynamic> row, {String? overrideLabel}) {
     final csvLabel = row['food_label']?.toString().trim() ?? '';
     final part = row['part_name']?.toString().trim() ?? '';

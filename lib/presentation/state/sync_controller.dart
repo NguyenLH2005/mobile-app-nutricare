@@ -250,7 +250,6 @@ class SyncController extends Notifier<AuthUserState> {
           'consumptionRatio': s.consumptionRatio,
           'logDate': s.logDate,
           'isInMenu': s.isInMenu,
-          'cookingMethod': s.cookingMethod,
           'nutritionData': s.decodedNutrition,
           'mainGroup': s.mainGroup,
           'originalImageBase64': origBase64,
@@ -382,7 +381,6 @@ class SyncController extends Notifier<AuthUserState> {
                       s['is_in_menu'] == 1 ||
                       s['isInMenu'] == true ||
                       s['isInMenu'] == 1),
-              cookingMethod: s['cooking_method'] ?? s['cookingMethod'],
               nutritionData: s['nutrition_data'] is String 
                   ? s['nutrition_data'] 
                   : jsonEncode(s['nutrition_data'] ?? []),

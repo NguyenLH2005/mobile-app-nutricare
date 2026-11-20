@@ -280,8 +280,6 @@ class _FoundObjectScreenState extends ConsumerState<FoundObjectScreen> {
 
     var rawFoodData = ref.read(foodRepositoryProvider).resolveRowFromFoodName(
       _currentData.foodName,
-      cookingMethod: _currentData.cookingMethod,
-      decodedNutrition: _currentData.decodedNutrition,
     );
     if (rawFoodData == null) {
       final decoded = _currentData.decodedNutrition;
@@ -404,7 +402,6 @@ class _FoundObjectScreenState extends ConsumerState<FoundObjectScreen> {
 
     final updatedData = _currentData.copyWith(
       foodName: formattedName,
-      cookingMethod: foodData['cooking_method']?.toString().trim(),
       servingUnits: servingCount,
       nutritionData: jsonEncode(nutritionArray),
       mainGroup: mainGroup,
@@ -426,11 +423,7 @@ class _FoundObjectScreenState extends ConsumerState<FoundObjectScreen> {
     final List<String> parts = repo.getPartsForLabel(displayLabel);
     if (parts.length < 2) return;
 
-    final currentRow = repo.resolveRowFromFoodName(
-      _currentData.foodName,
-      cookingMethod: _currentData.cookingMethod,
-      decodedNutrition: _currentData.decodedNutrition,
-    );
+    final currentRow = repo.resolveRowFromFoodName(_currentData.foodName);
     final String currentPart = currentRow?['part_name']?.toString().trim() ?? '';
     String selectedPart = parts.contains(currentPart) ? currentPart : parts.first;
 
@@ -496,15 +489,8 @@ class _FoundObjectScreenState extends ConsumerState<FoundObjectScreen> {
                           final part = parts[idx];
                           final isSelected = part == selectedPart;
                           final isDefault = idx == 0;
-                          final cookRows = repo.getCookingRowsForPart(displayLabel, part);
-                          final prefRow = cookRows.isNotEmpty ? cookRows.first : null;
-                          final kcalVal = double.tryParse(prefRow?['Năng lượng']?.toString() ?? '') ?? 0.0;
-                          final methodsText = cookRows.length >= 2
-                              ? cookRows
-                                  .map((r) => r['cooking_method']?.toString().trim() ?? '')
-                                  .where((m) => m.isNotEmpty)
-                                  .join(' · ')
-                              : '';
+                          final partRow = repo.findRowForPart(displayLabel, part);
+                          final kcalVal = double.tryParse(partRow?['Năng lượng']?.toString() ?? '') ?? 0.0;
 
                           return InkWell(
                             onTap: () {
@@ -575,13 +561,6 @@ class _FoundObjectScreenState extends ConsumerState<FoundObjectScreen> {
                                             ],
                                           ],
                                         ),
-                                        if (methodsText.isNotEmpty) ...[
-                                          const SizedBox(height: 2),
-                                          Text(
-                                            methodsText,
-                                            style: TextStyle(fontSize: 11.5, color: Colors.grey.shade600),
-                                          ),
-                                        ],
                                       ],
                                     ),
                                   ),
@@ -615,7 +594,7 @@ class _FoundObjectScreenState extends ConsumerState<FoundObjectScreen> {
                       child: ElevatedButton(
                         onPressed: () {
                           Navigator.pop(bottomSheetContext);
-                          final targetRow = repo.findPreferredRowForPart(displayLabel, selectedPart);
+                          final targetRow = repo.findRowForPart(displayLabel, selectedPart);
                           if (targetRow != null) {
                             _applySelectedCsvRow(targetRow, displayLabel: displayLabel);
                           }
@@ -1093,20 +1072,6 @@ class _FoundObjectScreenState extends ConsumerState<FoundObjectScreen> {
     final String displayLabel = _isEggFood ? 'Trứng' : foodRepo.resolveDisplayLabel(_currentData.foodName);
     final List<String> availableParts = _isEggFood ? const [] : foodRepo.getPartsForLabel(displayLabel);
     final bool hasMultipleParts = !_isEggFood && availableParts.length >= 2;
-    final Map<String, dynamic>? currentCsvRow = _isEggFood
-        ? null
-        : foodRepo.resolveRowFromFoodName(
-            _currentData.foodName,
-            cookingMethod: _currentData.cookingMethod,
-            decodedNutrition: _currentData.decodedNutrition,
-          );
-    final String currentPartName = currentCsvRow?['part_name']?.toString().trim() ??
-        (availableParts.isNotEmpty ? availableParts.first : '');
-    final String currentCookingMethod =
-        currentCsvRow?['cooking_method']?.toString().trim() ?? 'Tươi';
-    final List<Map<String, dynamic>> cookingRows =
-        _isEggFood ? const [] : foodRepo.getCookingRowsForPart(displayLabel, currentPartName);
-    final bool showCookingCard = !_isEggFood && cookingRows.isNotEmpty;
 
     final servingUnits = foodRepo.calculateAllServingUnits(
       mainGroup: _currentData.mainGroup,
@@ -1294,93 +1259,6 @@ class _FoundObjectScreenState extends ConsumerState<FoundObjectScreen> {
                 ),
               ),
               const SizedBox(height: 12),
-
-              // 2.15. PHƯƠNG PHÁP CHẾ BIẾN (luôn hiển thị cho các món không phải trứng)
-              if (showCookingCard && cookingRows.isNotEmpty) ...[
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(14),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(12),
-                    boxShadow: [
-                      BoxShadow(color: Colors.black.withValues(alpha: 0.02), blurRadius: 8, offset: const Offset(0, 3)),
-                    ],
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Icon(Icons.local_fire_department_outlined, size: 18, color: Colors.deepOrange.shade600),
-                          const SizedBox(width: 6),
-                          const Expanded(
-                            child: Text(
-                              'Phương pháp chế biến',
-                              style: TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.bold,
-                                color: Color(0xFF1B233A),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 10),
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: cookingRows.map((row) {
-                          final String method = row['cooking_method']?.toString().trim() ?? 'Tươi';
-                          final bool isSelected = method.toLowerCase() == currentCookingMethod.toLowerCase();
-                          final double kcalVal = double.tryParse(row['Năng lượng']?.toString() ?? '') ?? 0.0;
-
-                          return InkWell(
-                            onTap: isSelected
-                                ? null
-                                : () => _applySelectedCsvRow(row, displayLabel: displayLabel),
-                            borderRadius: BorderRadius.circular(10),
-                            child: AnimatedContainer(
-                              duration: const Duration(milliseconds: 160),
-                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-                              decoration: BoxDecoration(
-                                color: isSelected ? Colors.green.shade100 : Colors.grey.shade100,
-                                borderRadius: BorderRadius.circular(10),
-                                border: Border.all(
-                                  color: isSelected ? Colors.green.shade600 : Colors.grey.shade300,
-                                  width: isSelected ? 1.5 : 1.0,
-                                ),
-                              ),
-                              child: Column(
-                                mainAxisSize: MainAxisSize.min,
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    method,
-                                    style: TextStyle(
-                                      fontSize: 13,
-                                      fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
-                                      color: isSelected ? Colors.green.shade900 : Colors.black87,
-                                    ),
-                                  ),
-                                  Text(
-                                    '${kcalVal.toStringAsFixed(0)} kcal',
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      color: isSelected ? Colors.green.shade800 : Colors.grey.shade600,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          );
-                        }).toList(),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 12),
-              ],
 
               // 2.2. THANH CHỌN HỆ SỐ TIÊU THỤ THỰC TẾ (gamma in (0, 1])
               Container(
